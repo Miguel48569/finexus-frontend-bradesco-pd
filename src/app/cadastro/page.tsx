@@ -3,87 +3,59 @@
 import Image from "next/image";
 import { useState } from "react";
 import ChoiceModal from "./components/ChoiceModal";
+import SignupForm from "./components/SignupForm";
 
 export default function CadastroPage() {
-  const [cadastroStep, setCadastroStep] = useState<
-    "choice" | "form_mei" | "form_investidor"
-  >("choice");
-  const [_userChoice, setUserChoice] = useState<"mei" | "investidor" | null>(
-    null
-  );
+  const [showForm, setShowForm] = useState(false);
+  const [userType, setUserType] = useState<"mei" | "investidor" | null>(null);
 
   const handleChoiceMade = (choice: "mei" | "investidor") => {
-    setUserChoice(choice);
-    if (choice === "mei") {
-      setCadastroStep("form_mei");
-    } else {
-      setCadastroStep("form_investidor");
-    }
+    setUserType(choice);
+    setShowForm(true);
+  };
+
+  const handleBack = () => {
+    setShowForm(false);
+    setUserType(null);
   };
 
   return (
     <main className="min-h-screen flex bg-slate-50">
-      {/* Coluna do Formulário (centralizada em telas menores) */}
-      <div className="w-full lg:w-1/2 flex flex-col justify-center items-center p-4 sm:p-8 relative">
-        <div className="absolute top-12 left-0 right-0 mx-auto w-full max-w-sm text-center">
+      {/* Coluna do Formulário */}
+      <div className="w-full lg:w-1/2 flex flex-col items-center p-4 sm:p-6 lg:p-8 py-6 sm:py-8 overflow-y-auto">
+        {/* Logo no topo - RESPONSIVO */}
+        <div className="w-full max-w-lg mb-6 sm:mb-8 lg:mb-12 flex-shrink-0">
           <Image
             src="/logo-finexus-df.png"
             alt="Finexus Logo"
-            width={240}
-            height={48}
+            width={200}
+            height={40}
             priority
-            className="mx-auto"
+            className="mx-auto w-40 sm:w-48 md:w-56 h-auto"
           />
         </div>
 
-        {/* Container do Card (max-w-lg para acomodar as 2 opções) */}
-        <div className="w-full max-w-lg">
-          {cadastroStep === "choice" && (
+        {/* Container do Card - CENTRALIZADO */}
+        <div className="w-full max-w-lg flex-shrink-0">
+          {!showForm ? (
             <ChoiceModal onChoiceMade={handleChoiceMade} />
-          )}
-          {cadastroStep === "form_mei" && (
-            <div className="bg-white p-8 rounded-2xl shadow-xl border border-gray-200/75">
-              <h2 className="text-2xl font-bold text-center mb-4">
-                Formulário de Cadastro MEI
-              </h2>
-              <p className="text-center text-gray-600">
-                Este é o próximo formulário para MEI.
-              </p>
-              <button
-                onClick={() => setCadastroStep("choice")}
-                className="mt-4 text-violet-600 hover:underline"
-              >
-                Voltar
-              </button>
-            </div>
-          )}
-          {cadastroStep === "form_investidor" && (
-            <div className="bg-white p-8 rounded-2xl shadow-xl border border-gray-200/75">
-              <h2 className="text-2xl font-bold text-center mb-4">
-                Formulário de Cadastro Investidor
-              </h2>
-              <p className="text-center text-gray-600">
-                Este é o próximo formulário para Investidor.
-              </p>
-              <button
-                onClick={() => setCadastroStep("choice")}
-                className="mt-4 text-violet-600 hover:underline"
-              >
-                Voltar
-              </button>
-            </div>
+          ) : (
+            <SignupForm userType={userType!} onBack={handleBack} />
           )}
         </div>
+
+        {/* Espaçamento inferior para mobile */}
+        <div className="h-6 sm:h-8 flex-shrink-0" />
       </div>
 
-      {/* Coluna da Imagem (IDÊNTICA A DE LOGIN) 👇 */}
-      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-violet-900 to-violet-700 items-center justify-center p-12 rounded-tl-3xl rounded-bl-3xl">
+      {/* Coluna da Imagem - Desktop */}
+      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-violet-900 to-violet-700 items-center justify-center p-12">
         <Image
-          src="/login-image.png" // 1. Imagem de login
-          alt="Ilustração de pessoas analisando gráficos e investimentos" // 2. Alt text de login
-          width={500} // 3. Tamanho de login
-          height={500} // 4. Tamanho de login
-          className="w-full max-w-md" // 5. Tamanho de login
+          src="/login-image.png"
+          alt="Ilustração de pessoas analisando gráficos e investimentos"
+          width={500}
+          height={500}
+          className="w-full max-w-md"
         />
       </div>
     </main>
