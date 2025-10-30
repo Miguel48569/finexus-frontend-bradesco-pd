@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Eye, EyeOff } from "lucide-react";
+import { ArrowLeft, Eye, EyeOff, User, Lock } from "lucide-react";
 
 interface SignupFormProps {
   userType: "mei" | "investidor";
@@ -11,17 +11,17 @@ interface SignupFormProps {
 
 export default function SignupForm({ userType, onBack }: SignupFormProps) {
   const router = useRouter();
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [showSenha, setShowSenha] = useState(false);
+  const [showConfirmarSenha, setShowConfirmarSenha] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   const [formData, setFormData] = useState({
-    name: "",
+    nome: "",
     email: "",
-    password: "",
-    confirmPassword: "",
+    senha: "",
+    confirmarSenha: "",
     cpf: "",
-    phone: "",
+    telefone: "",
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -38,8 +38,8 @@ export default function SignupForm({ userType, onBack }: SignupFormProps) {
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
 
-    if (!formData.name.trim()) {
-      newErrors.name = "Nome é obrigatório";
+    if (!formData.nome.trim()) {
+      newErrors.nome = "Nome é obrigatório";
     }
 
     if (!formData.email.trim()) {
@@ -52,18 +52,18 @@ export default function SignupForm({ userType, onBack }: SignupFormProps) {
       newErrors.cpf = "CPF é obrigatório";
     }
 
-    if (!formData.phone.trim()) {
-      newErrors.phone = "Telefone é obrigatório";
+    if (!formData.telefone.trim()) {
+      newErrors.telefone = "Telefone é obrigatório";
     }
 
-    if (!formData.password) {
-      newErrors.password = "Senha é obrigatória";
-    } else if (formData.password.length < 6) {
-      newErrors.password = "Senha deve ter no mínimo 6 caracteres";
+    if (!formData.senha) {
+      newErrors.senha = "Senha é obrigatória";
+    } else if (formData.senha.length < 6) {
+      newErrors.senha = "Senha deve ter no mínimo 6 caracteres";
     }
 
-    if (formData.password !== formData.confirmPassword) {
-      newErrors.confirmPassword = "As senhas não coincidem";
+    if (formData.senha !== formData.confirmarSenha) {
+      newErrors.confirmarSenha = "As senhas não coincidem";
     }
 
     setErrors(newErrors);
@@ -137,29 +137,34 @@ export default function SignupForm({ userType, onBack }: SignupFormProps) {
       </div>
 
       {/* Formulário */}
-      <div className="space-y-3.5 sm:space-y-4 md:space-y-5">
-        {/* Nome Completo */}
+      <div className="space-y-4 sm:space-y-5">
+        {/* Campo Nome */}
         <div>
           <label
-            htmlFor="name"
-            className="block text-xs sm:text-sm font-medium text-gray-700 mb-1"
+            htmlFor="nome"
+            className="block text-xs sm:text-sm font-semibold text-gray-700 mb-1"
           >
-            Seu Nome Completo *
+            Nome Completo <span className="text-red-500">*</span>
           </label>
-          <input
-            type="text"
-            id="name"
-            name="name"
-            value={formData.name}
-            onChange={handleChange}
-            className={`w-full px-3 sm:px-4 py-2 sm:py-2.5 text-sm sm:text-base border rounded-lg focus:ring-2 focus:ring-violet-500 focus:border-transparent transition-all ${
-              errors.name ? "border-red-500" : "border-gray-300"
-            }`}
-            placeholder="Seu nome completo"
-          />
-          {errors.name && (
+          <div className="relative">
+            <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+              <User className="h-4 w-4 sm:h-5 sm:w-5 text-gray-400" />
+            </div>
+            <input
+              type="text"
+              id="nome"
+              name="nome"
+              value={formData.nome}
+              onChange={handleChange}
+              placeholder="Seu nome completo"
+              className={`block w-full rounded-lg border-transparent bg-slate-100 py-2.5 sm:py-3 pl-9 sm:pl-10 pr-3 text-sm sm:text-base text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-500 ${
+                errors.nome ? "ring-2 ring-red-500" : ""
+              }`}
+            />
+          </div>
+          {errors.nome && (
             <p className="mt-1 text-xs sm:text-sm text-red-600">
-              {errors.name}
+              {errors.nome}
             </p>
           )}
         </div>
@@ -168,21 +173,26 @@ export default function SignupForm({ userType, onBack }: SignupFormProps) {
         <div>
           <label
             htmlFor="email"
-            className="block text-xs sm:text-sm font-medium text-gray-700 mb-1"
+            className="block text-xs sm:text-sm font-semibold text-gray-700 mb-1"
           >
-            Seu Email *
+            Seu Email <span className="text-red-500">*</span>
           </label>
-          <input
-            type="email"
-            id="email"
-            name="email"
-            value={formData.email}
-            onChange={handleChange}
-            className={`w-full px-3 sm:px-4 py-2 sm:py-2.5 text-sm sm:text-base border rounded-lg focus:ring-2 focus:ring-violet-500 focus:border-transparent transition-all ${
-              errors.email ? "border-red-500" : "border-gray-300"
-            }`}
-            placeholder="seu@email.com"
-          />
+          <div className="relative">
+            <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+              <User className="h-4 w-4 sm:h-5 sm:w-5 text-gray-400" />
+            </div>
+            <input
+              type="email"
+              id="email"
+              name="email"
+              value={formData.email}
+              onChange={handleChange}
+              placeholder="seu@email.com"
+              className={`block w-full rounded-lg border-transparent bg-slate-100 py-2.5 sm:py-3 pl-9 sm:pl-10 pr-3 text-sm sm:text-base text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-500 ${
+                errors.email ? "ring-2 ring-red-500" : ""
+              }`}
+            />
+          </div>
           {errors.email && (
             <p className="mt-1 text-xs sm:text-sm text-red-600">
               {errors.email}
@@ -195,21 +205,26 @@ export default function SignupForm({ userType, onBack }: SignupFormProps) {
           <div>
             <label
               htmlFor="cpf"
-              className="block text-xs sm:text-sm font-medium text-gray-700 mb-1"
+              className="block text-xs sm:text-sm font-semibold text-gray-700 mb-1"
             >
-              Seu CPF *
+              Seu CPF <span className="text-red-500">*</span>
             </label>
-            <input
-              type="text"
-              id="cpf"
-              name="cpf"
-              value={formData.cpf}
-              onChange={handleChange}
-              className={`w-full px-3 sm:px-4 py-2 sm:py-2.5 text-sm sm:text-base border rounded-lg focus:ring-2 focus:ring-violet-500 focus:border-transparent transition-all ${
-                errors.cpf ? "border-red-500" : "border-gray-300"
-              }`}
-              placeholder="000.000.000-00"
-            />
+            <div className="relative">
+              <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                <User className="h-4 w-4 sm:h-5 sm:w-5 text-gray-400" />
+              </div>
+              <input
+                type="text"
+                id="cpf"
+                name="cpf"
+                value={formData.cpf}
+                onChange={handleChange}
+                placeholder="000.000.000-00"
+                className={`block w-full rounded-lg border-transparent bg-slate-100 py-2.5 sm:py-3 pl-9 sm:pl-10 pr-3 text-sm sm:text-base text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-500 ${
+                  errors.cpf ? "ring-2 ring-red-500" : ""
+                }`}
+              />
+            </div>
             {errors.cpf && (
               <p className="mt-1 text-xs sm:text-sm text-red-600">
                 {errors.cpf}
@@ -219,104 +234,115 @@ export default function SignupForm({ userType, onBack }: SignupFormProps) {
 
           <div>
             <label
-              htmlFor="phone"
-              className="block text-xs sm:text-sm font-medium text-gray-700 mb-1"
+              htmlFor="telefone"
+              className="block text-xs sm:text-sm font-semibold text-gray-700 mb-1"
             >
-              Seu Telefone *
+              Seu Telefone <span className="text-red-500">*</span>
             </label>
-            <input
-              type="tel"
-              id="phone"
-              name="phone"
-              value={formData.phone}
-              onChange={handleChange}
-              className={`w-full px-3 sm:px-4 py-2 sm:py-2.5 text-sm sm:text-base border rounded-lg focus:ring-2 focus:ring-violet-500 focus:border-transparent transition-all ${
-                errors.phone ? "border-red-500" : "border-gray-300"
-              }`}
-              placeholder="(00) 00000-0000"
-            />
-            {errors.phone && (
+            <div className="relative">
+              <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                <User className="h-4 w-4 sm:h-5 sm:w-5 text-gray-400" />
+              </div>
+              <input
+                type="tel"
+                id="telefone"
+                name="telefone"
+                value={formData.telefone}
+                onChange={handleChange}
+                placeholder="(00) 00000-0000"
+                className={`block w-full rounded-lg border-transparent bg-slate-100 py-2.5 sm:py-3 pl-9 sm:pl-10 pr-3 text-sm sm:text-base text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-500 ${
+                  errors.telefone ? "ring-2 ring-red-500" : ""
+                }`}
+              />
+            </div>
+            {errors.telefone && (
               <p className="mt-1 text-xs sm:text-sm text-red-600">
-                {errors.phone}
+                {errors.telefone}
               </p>
             )}
           </div>
         </div>
 
-        {/* Senha */}
+        {/* Campo Senha */}
         <div>
           <label
-            htmlFor="password"
-            className="block text-xs sm:text-sm font-medium text-gray-700 mb-1"
+            htmlFor="senha"
+            className="block text-xs sm:text-sm font-semibold text-gray-700 mb-1"
           >
-            Crie uma Senha *
+            Senha <span className="text-red-500">*</span>
           </label>
           <div className="relative">
+            <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+              <Lock className="h-4 w-4 sm:h-5 sm:w-5 text-gray-400" />
+            </div>
             <input
-              type={showPassword ? "text" : "password"}
-              id="password"
-              name="password"
-              value={formData.password}
+              type={showSenha ? "text" : "password"}
+              id="senha"
+              name="senha"
+              value={formData.senha}
               onChange={handleChange}
-              className={`w-full px-3 sm:px-4 py-2 sm:py-2.5 text-sm sm:text-base border rounded-lg focus:ring-2 focus:ring-violet-500 focus:border-transparent transition-all pr-10 ${
-                errors.password ? "border-red-500" : "border-gray-300"
-              }`}
               placeholder="Mínimo 6 caracteres"
+              className={`block w-full rounded-lg border-transparent bg-slate-100 py-2.5 sm:py-3 pl-9 sm:pl-10 pr-10 text-sm sm:text-base text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-500 ${
+                errors.senha ? "ring-2 ring-red-500" : ""
+              }`}
             />
             <button
               type="button"
-              onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+              onClick={() => setShowSenha(!showSenha)}
+              className="absolute inset-y-0 right-0 flex items-center pr-3"
             >
-              {showPassword ? (
-                <EyeOff className="h-4 w-4 sm:h-5 sm:w-5" />
+              {showSenha ? (
+                <EyeOff className="h-4 w-4 sm:h-5 sm:w-5 text-gray-400 hover:text-gray-600" />
               ) : (
-                <Eye className="h-4 w-4 sm:h-5 sm:w-5" />
+                <Eye className="h-4 w-4 sm:h-5 sm:w-5 text-gray-400 hover:text-gray-600" />
               )}
             </button>
           </div>
-          {errors.password && (
+          {errors.senha && (
             <p className="mt-1 text-xs sm:text-sm text-red-600">
-              {errors.password}
+              {errors.senha}
             </p>
           )}
         </div>
 
-        {/* Confirmar Senha */}
+        {/* Campo Confirmar Senha */}
         <div>
           <label
-            htmlFor="confirmPassword"
-            className="block text-xs sm:text-sm font-medium text-gray-700 mb-1"
+            htmlFor="confirmarSenha"
+            className="block text-xs sm:text-sm font-semibold text-gray-700 mb-1"
           >
-            Confirme a Senha *
+            Confirmar Senha <span className="text-red-500">*</span>
           </label>
           <div className="relative">
+            <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+              <Lock className="h-4 w-4 sm:h-5 sm:w-5 text-gray-400" />
+            </div>
             <input
-              type={showConfirmPassword ? "text" : "password"}
-              id="confirmPassword"
-              name="confirmPassword"
-              value={formData.confirmPassword}
+              type={showConfirmarSenha ? "text" : "password"}
+              id="confirmarSenha"
+              name="confirmarSenha"
+              value={formData.confirmarSenha}
               onChange={handleChange}
-              className={`w-full px-3 sm:px-4 py-2 sm:py-2.5 text-sm sm:text-base border rounded-lg focus:ring-2 focus:ring-violet-500 focus:border-transparent transition-all pr-10 ${
-                errors.confirmPassword ? "border-red-500" : "border-gray-300"
-              }`}
               placeholder="Digite a senha novamente"
+              className={`block w-full rounded-lg border-transparent bg-slate-100 py-2.5 sm:py-3 pl-9 sm:pl-10 pr-10 text-sm sm:text-base text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-500 ${
+                errors.confirmarSenha ? "ring-2 ring-red-500" : ""
+              }`}
             />
             <button
               type="button"
-              onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-              className="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+              onClick={() => setShowConfirmarSenha(!showConfirmarSenha)}
+              className="absolute inset-y-0 right-0 flex items-center pr-3"
             >
-              {showConfirmPassword ? (
-                <EyeOff className="h-4 w-4 sm:h-5 sm:w-5" />
+              {showConfirmarSenha ? (
+                <EyeOff className="h-4 w-4 sm:h-5 sm:w-5 text-gray-400 hover:text-gray-600" />
               ) : (
-                <Eye className="h-4 w-4 sm:h-5 sm:w-5" />
+                <Eye className="h-4 w-4 sm:h-5 sm:w-5 text-gray-400 hover:text-gray-600" />
               )}
             </button>
           </div>
-          {errors.confirmPassword && (
+          {errors.confirmarSenha && (
             <p className="mt-1 text-xs sm:text-sm text-red-600">
-              {errors.confirmPassword}
+              {errors.confirmarSenha}
             </p>
           )}
         </div>

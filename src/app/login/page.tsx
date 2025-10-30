@@ -1,5 +1,12 @@
 import Image from "next/image";
 import FormLogin from "./components/formLogin";
+import { Metadata } from "next";
+
+export const metadata: Metadata = {
+  metadataBase: new URL("https://localhost:3000") /* your base URL */,
+  title: "Login - Finexus",
+  description: "Faça login na plataforma Finexus",
+};
 
 export default function LoginPage() {
   return (

@@ -13,12 +13,13 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://localhost:3000"), /* your base URL */
   title: "Finexus",
   description: "Plataforma de Investimentos",
   openGraph: {
     title: "Finexus",
     description: "Plataforma de Investimentos",
-    images: ["./../../public/url-image.png"],
+    images: ["/public/url-image.png"],
   },
 };
 
