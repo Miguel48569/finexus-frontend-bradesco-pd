@@ -21,7 +21,7 @@ export default function LoginPage() {
             width={200}
             height={40}
             priority
-            className="mx-auto w-40 sm:w-48 md:w-56 h-auto"
+            className="mx-auto w-40 sm:w-48 md:w-56 h-auto animate-pulse" //animação de piscar na logo animate-pulse
           />
         </div>
 
@@ -43,7 +43,7 @@ export default function LoginPage() {
           alt="Ilustração de pessoas analisando gráficos e investimentos"
           width={500}
           height={500}
-          className="w-full max-w-md"
+          className="w-full max-w-md animate-pulse"
         />
       </div>
     </main>

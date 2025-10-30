@@ -51,11 +51,11 @@ export default function CadastroView() {
       {/* Coluna da Imagem - Desktop */}
       <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-violet-900 to-violet-700 items-center justify-center p-12">
         <Image
-          src="/login-image.png"
+          src="/money-pana.png"
           alt="Ilustração de pessoas analisando gráficos e investimentos"
           width={500}
           height={500}
-          className="w-full max-w-md"
+          className="w-full max-w-md animate-pulse"
         />
       </div>
     </main>
