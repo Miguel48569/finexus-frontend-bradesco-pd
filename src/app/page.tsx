@@ -356,7 +356,7 @@ export default function LandingPage() {
               number="01"
               icon={<Users className="w-10 h-10 text-[#6b34c8]" />}
               title="Cadastro Simplificado"
-              description="MEIs e investidores se cadastram na plataforma de forma rápida e segura com validação via Open Finance."
+              description="MEIs e investidores se cadastram na plataforma de forma rápida e segura."
             />
             <ProcessStep
               number="02"
