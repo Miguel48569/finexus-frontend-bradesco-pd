@@ -53,7 +53,7 @@ export default function FormLogin() {
     // Simulação: Por enquanto apenas redireciona (substitua pela sua API depois)
     setTimeout(() => {
       console.log("Dados do login:", formData);
-      router.push("/home");
+      router.push("/dashboard");
     }, 1000);
 
     // TODO: Quando criar a API, descomente o código abaixo:
@@ -184,7 +184,7 @@ export default function FormLogin() {
       <div className="mt-5 sm:mt-6 text-center text-xs sm:text-sm space-y-2">
         <p>
           <Link
-            href="/recuperar-senha"
+            href="/esqueci-senha"
             className="font-semibold text-violet-700 hover:text-violet-500 hover:underline"
           >
             Esqueceu sua senha?

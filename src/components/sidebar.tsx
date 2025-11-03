@@ -14,6 +14,8 @@ import {
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 interface SidebarProps {
   activeRoute: string;
@@ -32,13 +34,33 @@ export default function Sidebar({
   isCollapsed,
   onToggleCollapse,
 }: SidebarProps) {
+  const pathname = usePathname();
+
   const menuItems = [
-    { id: "dashboard", label: "Dashboard", icon: Home },
-    { id: "emprestimos", label: "Empréstimos", icon: DollarSign },
-    { id: "contratos", label: "Contratos", icon: FileCheck },
-    { id: "usuario", label: "Usuário", icon: User },
-    { id: "configuracoes", label: "Configurações", icon: Settings },
+    { id: "dashboard", label: "Dashboard", icon: Home, route: "/dashboard" },
+    { id: "extrato", label: "Extrato", icon: DollarSign, route: "/extrato" },
+    {
+      id: "contratos",
+      label: "Contratos",
+      icon: FileCheck,
+      route: "/contratos",
+    },
+    { id: "perfil", label: "Meu Perfil", icon: User, route: "/perfil" },
+    {
+      id: "settings",
+      label: "Configurações",
+      icon: Settings,
+      route: "/settings",
+    },
   ];
+
+  // Atualiza o item ativo baseado na URL atual
+  React.useEffect(() => {
+    const currentItem = menuItems.find((item) => item.route === pathname);
+    if (currentItem) {
+      onRouteChange(currentItem.id);
+    }
+  }, [pathname]);
 
   return (
     <>
@@ -114,15 +136,13 @@ export default function Sidebar({
             const isActive = activeRoute === item.id;
 
             return (
-              <motion.button
+              <Link
                 key={item.id}
+                href={item.route}
                 onClick={() => {
                   onRouteChange(item.id);
                   if (window.innerWidth < 1024) onClose();
                 }}
-                whileHover={{ scale: 1.02, x: isCollapsed ? 0 : 4 }}
-                whileTap={{ scale: 0.98 }}
-                title={isCollapsed ? item.label : undefined}
                 className={`
                   w-full flex items-center gap-3 px-4 py-3 rounded-xl
                   transition-all duration-200 group
@@ -152,17 +172,15 @@ export default function Sidebar({
                     className="ml-auto w-1.5 h-1.5 bg-violet-600 rounded-full"
                   />
                 )}
-              </motion.button>
+              </Link>
             );
           })}
         </nav>
 
         {/* Logout */}
         <div className="p-4 border-t border-violet-600/30">
-          <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            title={isCollapsed ? "Sair" : undefined}
+          <Link
+            href="/"
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-violet-100 hover:bg-red-500/20 hover:text-red-200 transition-all ${
               isCollapsed ? "justify-center" : ""
             }`}
@@ -175,7 +193,7 @@ export default function Sidebar({
             >
               Sair
             </span>
-          </motion.button>
+          </Link>
         </div>
       </aside>
     </>
