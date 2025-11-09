@@ -2,19 +2,19 @@
 
 import React, { useState } from "react";
 import {
-  TrendingDown,
   TrendingUp,
-  Calendar,
-  FileText,
   Wallet,
-  Bell,
-  User,
+  DollarSign,
+  ArrowRight,
   CheckCircle,
+  Plus,
+  ArrowUpRight,
+  Clock,
   AlertCircle,
-  Calculator,
-  ChevronRight,
+  X,
+  ArrowDown,
+  ArrowUp,
 } from "lucide-react";
-import { motion } from "framer-motion";
 import {
   PieChart,
   Pie,
@@ -22,377 +22,491 @@ import {
   ResponsiveContainer,
   LineChart,
   Line,
+  CartesianGrid,
   XAxis,
   YAxis,
   Tooltip,
-  BarChart,
-  Bar,
-  Legend,
 } from "recharts";
 
+interface Emprestimo {
+  id: number;
+  empresa: string;
+  valor: number;
+  pago: number;
+  juros: number;
+  status: "Ativo" | "Quitado" | "Atrasado";
+  dataVencimento: string;
+  dataSolicitacao: string;
+}
+
+const emprestimos: Emprestimo[] = [
+  {
+    id: 1,
+    empresa: "Cafeteria Aroma Bom",
+    valor: 5000,
+    pago: 3000,
+    juros: 3.2,
+    status: "Ativo",
+    dataVencimento: "15/12/2025",
+    dataSolicitacao: "15/06/2025",
+  },
+  {
+    id: 2,
+    empresa: "Loja Fashion Style",
+    valor: 8000,
+    pago: 8000,
+    juros: 2.8,
+    status: "Quitado",
+    dataVencimento: "01/11/2025",
+    dataSolicitacao: "01/05/2025",
+  },
+  {
+    id: 3,
+    empresa: "Oficina AutoPro",
+    valor: 6000,
+    pago: 1500,
+    juros: 4.1,
+    status: "Ativo",
+    dataVencimento: "20/01/2026",
+    dataSolicitacao: "20/07/2025",
+  },
+  {
+    id: 4,
+    empresa: "Restaurante Sabor & Cia",
+    valor: 7500,
+    pago: 4500,
+    juros: 3.7,
+    status: "Ativo",
+    dataVencimento: "10/02/2026",
+    dataSolicitacao: "10/08/2025",
+  },
+];
+
+const historicoMensal = [
+  { mes: "Jan", valor: 0 },
+  { mes: "Fev", valor: 0 },
+  { mes: "Mar", valor: 0 },
+  { mes: "Abr", valor: 0 },
+  { mes: "Mai", valor: 8000 },
+  { mes: "Jun", valor: 13000 },
+  { mes: "Jul", valor: 19000 },
+  { mes: "Ago", valor: 26500 },
+  { mes: "Set", valor: 26500 },
+  { mes: "Out", valor: 26500 },
+  { mes: "Nov", valor: 26500 },
+];
+
+const COLORS = ["#7C3AED", "#A78BFA", "#EC4899", "#C4B5FD"];
+
 export default function DashboardMEI() {
-  const [user] = useState({ nome: "Ana Souza", tipo: "Cliente Premium" });
+  const [showResgatarModal, setShowResgatarModal] = useState(false);
+  const [showSuccessMessage, setShowSuccessMessage] = useState(false);
 
-  const mockData = {
-    resumo: {
-      saldoDisponivel: 2780.5,
-      saldoDevedor: 34729.16,
-      pagamentoMensal: 1820,
-      totalPago: 21630,
-      contratosAtivos: 2,
-    },
-    emprestimosAtivos: [
-      {
-        id: 1,
-        nome: "Capital de Giro",
-        status: "Ativo",
-        valorEmprestado: 20000,
-        valorRestante: 13000,
-        progresso: 35,
-        parcelas: "10/24",
-        parcelaMensal: 650,
-        taxaJuros: "1.2% a.m.",
-        proximoVencimento: "14/11/2025",
-      },
-      {
-        id: 2,
-        nome: "Compra de Maquinário",
-        status: "Em Atraso",
-        valorEmprestado: 30000,
-        valorRestante: 18000,
-        progresso: 40,
-        parcelas: "12/36",
-        parcelaMensal: 890,
-        taxaJuros: "1.4% a.m.",
-        proximoVencimento: "19/11/2025",
-      },
-    ],
-    emprestimosFinalizados: [
-      {
-        id: 3,
-        nome: "Compra de Estoque",
-        status: "Quitado",
-        valorEmprestado: 10000,
-        valorPago: 10000,
-        progresso: 100,
-        parcelas: "24/24",
-        taxaJuros: "1.5% a.m.",
-      },
-    ],
-    graficos: {
-      distribuicao: [
-        { name: "Compra de Estoque", value: 40 },
-        { name: "Compra de Maquinário", value: 30 },
-        { name: "Capital de Giro", value: 30 },
-      ],
-      historicoPagamentos: [
-        { mes: "Mai", valor: 1200 },
-        { mes: "Jun", valor: 1500 },
-        { mes: "Jul", valor: 1800 },
-        { mes: "Ago", valor: 1900 },
-        { mes: "Set", valor: 2000 },
-        { mes: "Out", valor: 2200 },
-      ],
-      comparativo: [
-        { nome: "Compra de Estoque", emprestado: 20000, pago: 7000 },
-        { nome: "Compra de Maquinário", emprestado: 30000, pago: 12000 },
-        { nome: "Capital de Giro", emprestado: 10000, pago: 10000 },
-      ],
-    },
+  const saldoDisponivel = 17000;
+  const saldoBloqueado = 9500;
+  const totalRecebido = 26500;
+  const portfolioTotal = saldoDisponivel + saldoBloqueado;
+  const variacao = 37.8;
+  const variacaoValor = 21589.99;
+  const emprestimosAtivos = emprestimos.filter((e) => e.status === "Ativo");
+  const proximoVencimento = emprestimosAtivos[0]?.dataVencimento || "Nenhum";
+
+  const dadosPizza = emprestimos
+    .filter((e) => e.status === "Ativo")
+    .map((e) => ({
+      name: e.empresa,
+      value: e.valor,
+    }));
+
+  const handleSolicitarInvestimento = () => {
+    console.log("Navegar para tela de solicitação");
   };
 
-  const COLORS = ["#7C3AED", "#22C55E", "#F97316"];
-
-  const formatCurrency = (value: number) =>
-    new Intl.NumberFormat("pt-BR", {
-      style: "currency",
-      currency: "BRL",
-    }).format(value);
-
-  const container = {
-    hidden: { opacity: 0 },
-    show: {
-      opacity: 1,
-      transition: { staggerChildren: 0.1 },
-    },
-  };
-
-  const item = {
-    hidden: { opacity: 0, y: 20 },
-    show: { opacity: 1, y: 0 },
+  const handleResgatar = () => {
+    setShowResgatarModal(false);
+    setShowSuccessMessage(true);
+    setTimeout(() => setShowSuccessMessage(false), 3000);
   };
 
   return (
-    <div className="flex flex-col flex-1 bg-gray-50">
-      {/* Header */}
-      <header className="bg-white/90 backdrop-blur-sm border-b border-violet-100 shadow-sm px-6 py-4 flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-bold text-violet-900">Painel do MEI</h1>
-          <p className="text-sm text-violet-600">
-            Acompanhe seus empréstimos e saldo financeiro
-          </p>
+    <div className="p-6 min-h-screen bg-gradient-to-br from-violet-50 via-white to-violet-100">
+      {/* Notificação de sucesso */}
+      {showSuccessMessage && (
+        <div className="fixed top-6 right-6 bg-green-500 text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 z-50 animate-fade-in">
+          <CheckCircle size={24} />
+          <span className="font-semibold">Operação realizada com sucesso!</span>
         </div>
-        <div className="flex items-center gap-4">
-          <button className="relative p-2 hover:bg-violet-100 rounded-full transition-colors">
-            <Bell className="w-5 h-5 text-violet-600" />
-            <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-          </button>
-          <div className="flex items-center gap-2 bg-violet-100 px-4 py-2 rounded-full">
-            <User className="w-5 h-5 text-violet-600" />
-            <div className="hidden sm:block">
-              <p className="text-sm font-semibold text-violet-900">
-                {user.nome}
-              </p>
-              <p className="text-xs text-violet-600">{user.tipo}</p>
-            </div>
+      )}
+
+      {/* Header com Portfolio Total */}
+      <div className="bg-gradient-to-br from-violet-600 to-purple-700 rounded-3xl p-8 mb-8 text-white shadow-xl">
+        <div className="flex items-start justify-between">
+          <div className="flex-1">
+            <p className="text-violet-200 mb-2 text-sm">Portfolio Total</p>
+            <h1 className="text-5xl font-bold mb-2">
+              R${" "}
+              {portfolioTotal.toLocaleString("pt-BR", {
+                minimumFractionDigits: 2,
+              })}
+            </h1>
+            <p className="text-violet-100 text-sm">
+              Saldo disponível para movimentação
+            </p>
+          </div>
+
+          {/* Botões de Ação - Estilo Banking */}
+          <div className="flex gap-3">
+            <button
+              onClick={handleSolicitarInvestimento}
+              className="flex items-center gap-2 px-6 py-3 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-xl font-semibold transition-all border border-white/20 hover:border-white/40"
+            >
+              <Plus size={20} />
+              Solicitar
+            </button>
+
+            <button
+              onClick={() => setShowResgatarModal(true)}
+              className="flex items-center gap-2 px-6 py-3 bg-white text-violet-600 hover:bg-violet-50 rounded-xl font-semibold transition-all shadow-lg hover:shadow-xl"
+            >
+              <DollarSign size={20} />
+              Resgatar
+            </button>
           </div>
         </div>
-      </header>
+      </div>
 
-      {/* Main content */}
-      <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-8 w-full max-w-7xl mx-auto box-border">
-        {/* Resumo */}
-        <motion.div
-          variants={container}
-          initial="hidden"
-          animate="show"
-          className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-8"
-        >
-          {/* Cards */}
-          {[
-            {
-              label: "Saldo disponível",
-              value: mockData.resumo.saldoDisponivel,
-              icon: <Wallet className="w-5 h-5 text-green-500" />,
-              color: "text-green-600",
-            },
-            {
-              label: "Saldo devedor",
-              value: mockData.resumo.saldoDevedor,
-              icon: <TrendingDown className="w-5 h-5 text-red-500" />,
-              color: "text-red-600",
-            },
-            {
-              label: "Pagamento mensal",
-              value: mockData.resumo.pagamentoMensal,
-              icon: <Calendar className="w-5 h-5 text-violet-500" />,
-              color: "text-violet-700",
-            },
-            {
-              label: "Total pago",
-              value: mockData.resumo.totalPago,
-              icon: <TrendingUp className="w-5 h-5 text-green-500" />,
-              color: "text-green-700",
-            },
-            {
-              label: "Contratos ativos",
-              value: mockData.resumo.contratosAtivos,
-              icon: <FileText className="w-5 h-5 text-violet-500" />,
-              color: "text-violet-700",
-            },
-          ].map((card, index) => (
-            <motion.div
-              key={index}
-              variants={item}
-              className="bg-white rounded-2xl p-6 shadow-lg border border-violet-100 hover:shadow-xl transition-all"
-            >
-              <div className="flex justify-between mb-2">
-                <p className="text-sm text-violet-600 font-medium">
-                  {card.label}
-                </p>
-                {card.icon}
-              </div>
-              <p className={`text-2xl font-bold ${card.color}`}>
-                {card.label === "Contratos ativos"
-                  ? String(card.value)
-                  : formatCurrency(card.value)}
-              </p>
-            </motion.div>
-          ))}
-        </motion.div>
-
-        {/* Botão de Resgate */}
-        <div className="mb-10 flex justify-end">
-          <button className="bg-gradient-to-r from-violet-600 to-violet-800 text-white font-semibold px-6 py-3 rounded-xl shadow-lg hover:scale-[1.02] transition-all">
-            Resgatar Saldo
-          </button>
+      {/* Cards de Resumo */}
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-6 mb-8">
+        <div className="bg-white rounded-2xl p-6 shadow-md border border-violet-100">
+          <div className="flex items-center gap-2 mb-2">
+            <TrendingUp className="text-violet-600" size={20} />
+            <p className="text-gray-500 text-sm">Carteira Total</p>
+          </div>
+          <h2 className="text-2xl font-bold text-gray-800">
+            R${" "}
+            {totalRecebido.toLocaleString("pt-BR", {
+              minimumFractionDigits: 2,
+            })}
+          </h2>
         </div>
 
-        {/* Empréstimos Ativos */}
-        <motion.div
-          variants={item}
-          initial="hidden"
-          animate="show"
-          className="bg-white rounded-2xl p-6 shadow-lg border border-violet-100 mb-8"
-        >
-          <h2 className="text-xl font-bold text-violet-900 mb-6">
-            Empréstimos Ativos
+        <div className="bg-white rounded-2xl p-6 shadow-md border border-violet-100">
+          <div className="flex items-center gap-2 mb-2">
+            <TrendingUp className="text-green-600" size={20} />
+            <p className="text-gray-500 text-sm">Variação Total</p>
+          </div>
+          <h2 className="text-2xl font-bold text-green-600">+{variacao}%</h2>
+          <p className="text-sm text-gray-500">
+            +R$ {variacaoValor.toLocaleString("pt-BR")}
+          </p>
+        </div>
+
+        <div className="bg-white rounded-2xl p-6 shadow-md border border-violet-100">
+          <div className="flex items-center gap-2 mb-2">
+            <CheckCircle className="text-blue-600" size={20} />
+            <p className="text-gray-500 text-sm">Empréstimos</p>
+          </div>
+          <h2 className="text-2xl font-bold text-gray-800">
+            {emprestimosAtivos.length}
           </h2>
-          <div className="space-y-5">
-            {mockData.emprestimosAtivos.map((emp) => (
+          <p className="text-sm text-gray-500">ativos</p>
+        </div>
+
+        <div className="bg-white rounded-2xl p-6 shadow-md border border-violet-100">
+          <div className="flex items-center gap-2 mb-2">
+            <DollarSign className="text-purple-600" size={20} />
+            <p className="text-gray-500 text-sm">Disponível</p>
+          </div>
+          <h2 className="text-2xl font-bold text-gray-800">
+            R$ {saldoDisponivel.toLocaleString("pt-BR")}
+          </h2>
+          <p className="text-sm text-gray-500">para resgate</p>
+        </div>
+      </div>
+
+      {/* Gráficos */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        {/* Performance vs Meta */}
+        <div className="bg-white rounded-3xl p-6 shadow-lg border border-violet-100">
+          <h3 className="text-xl font-bold text-gray-800 mb-4">
+            Histórico de Captação
+          </h3>
+          <div className="h-80">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={historicoMensal}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+                <XAxis dataKey="mes" stroke="#6B7280" />
+                <YAxis stroke="#6B7280" />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: "#fff",
+                    border: "1px solid #E5E7EB",
+                    borderRadius: "8px",
+                  }}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="valor"
+                  stroke="#7C3AED"
+                  strokeWidth={3}
+                  dot={{ fill: "#7C3AED", r: 4 }}
+                  fill="url(#colorUv)"
+                />
+                <defs>
+                  <linearGradient id="colorUv" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#7C3AED" stopOpacity={0.1} />
+                    <stop offset="95%" stopColor="#7C3AED" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Alocação de Ativos */}
+        <div className="bg-white rounded-3xl p-6 shadow-lg border border-violet-100">
+          <h3 className="text-xl font-bold text-gray-800 mb-4">
+            Distribuição dos Empréstimos
+          </h3>
+          <div className="h-80 flex items-center justify-center">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={dadosPizza}
+                  innerRadius={80}
+                  outerRadius={120}
+                  dataKey="value"
+                  paddingAngle={5}
+                >
+                  {dadosPizza.map((_, index) => (
+                    <Cell
+                      key={`cell-${index}`}
+                      fill={COLORS[index % COLORS.length]}
+                    />
+                  ))}
+                </Pie>
+                <Tooltip
+                  formatter={(value: number) =>
+                    `R$ ${value.toLocaleString("pt-BR")}`
+                  }
+                />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="mt-4 space-y-2">
+            {dadosPizza.map((item, index) => (
               <div
-                key={emp.id}
-                className="border border-violet-100 rounded-xl p-5 hover:shadow-lg hover:shadow-violet-100 transition-all"
+                key={index}
+                className="flex items-center justify-between text-sm"
               >
-                <div className="flex justify-between items-start mb-4">
-                  <div className="flex items-center gap-3">
-                    {emp.status === "Ativo" ? (
-                      <CheckCircle className="w-5 h-5 text-green-500" />
-                    ) : (
-                      <AlertCircle className="w-5 h-5 text-red-500" />
-                    )}
-                    <div>
-                      <h3 className="font-semibold text-violet-900">
-                        {emp.nome}
-                      </h3>
+                <div className="flex items-center gap-2">
+                  <div
+                    className="w-3 h-3 rounded-full"
+                    style={{ backgroundColor: COLORS[index % COLORS.length] }}
+                  ></div>
+                  <span className="text-gray-700">{item.name}</span>
+                </div>
+                <span className="font-semibold text-gray-800">
+                  {(
+                    (item.value /
+                      emprestimosAtivos.reduce((acc, e) => acc + e.valor, 0)) *
+                    100
+                  ).toFixed(0)}
+                  %
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Tabela de Empréstimos Detalhados */}
+      <div className="bg-white rounded-3xl p-6 shadow-lg border border-violet-100">
+        <h3 className="text-xl font-bold text-gray-800 mb-6">
+          Empréstimos Detalhados
+        </h3>
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-gray-200">
+                <th className="text-left py-4 px-4 font-semibold text-gray-600 text-sm">
+                  Empresa
+                </th>
+                <th className="text-left py-4 px-4 font-semibold text-gray-600 text-sm">
+                  Status
+                </th>
+                <th className="text-left py-4 px-4 font-semibold text-gray-600 text-sm">
+                  Valor Total
+                </th>
+                <th className="text-left py-4 px-4 font-semibold text-gray-600 text-sm">
+                  Valor Pago
+                </th>
+                <th className="text-left py-4 px-4 font-semibold text-gray-600 text-sm">
+                  Taxa Juros
+                </th>
+                <th className="text-left py-4 px-4 font-semibold text-gray-600 text-sm">
+                  Progresso
+                </th>
+                <th className="text-left py-4 px-4 font-semibold text-gray-600 text-sm">
+                  Vencimento
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {emprestimos.map((emp) => {
+                const progresso = (emp.pago / emp.valor) * 100;
+                return (
+                  <tr
+                    key={emp.id}
+                    className="border-b border-gray-100 hover:bg-violet-50 transition-colors"
+                  >
+                    <td className="py-4 px-4">
+                      <p className="font-semibold text-gray-800">
+                        {emp.empresa}
+                      </p>
+                    </td>
+                    <td className="py-4 px-4">
                       <span
-                        className={`text-xs px-2 py-1 rounded-full font-medium ${
+                        className={`px-3 py-1 rounded-full text-xs font-semibold ${
                           emp.status === "Ativo"
+                            ? "bg-violet-100 text-violet-700"
+                            : emp.status === "Quitado"
                             ? "bg-green-100 text-green-700"
                             : "bg-red-100 text-red-700"
                         }`}
                       >
                         {emp.status}
                       </span>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-bold text-violet-900 text-lg">
-                      {formatCurrency(emp.valorRestante)}
-                    </p>
-                    <p className="text-xs text-violet-600">Restante</p>
-                  </div>
-                </div>
-
-                <div className="w-full bg-violet-100 h-2.5 rounded-full mb-3 overflow-hidden">
-                  <motion.div
-                    initial={{ width: 0 }}
-                    animate={{ width: `${emp.progresso}%` }}
-                    transition={{ duration: 1 }}
-                    className={`h-2.5 rounded-full ${
-                      emp.status === "Ativo"
-                        ? "bg-gradient-to-r from-violet-500 to-violet-600"
-                        : "bg-red-500"
-                    }`}
-                  ></motion.div>
-                </div>
-
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
-                  <div>
-                    <p className="text-violet-600">Parcelas</p>
-                    <p className="font-semibold text-violet-900">
-                      {emp.parcelas}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-violet-600">Parcela Mensal</p>
-                    <p className="font-semibold text-violet-900">
-                      {formatCurrency(emp.parcelaMensal)}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-violet-600">Taxa</p>
-                    <p className="font-semibold text-green-600">
-                      {emp.taxaJuros}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-violet-600">Próx. Vencimento</p>
-                    <p className="font-semibold text-violet-900">
-                      {emp.proximoVencimento}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </motion.div>
-
-        {/* Gráficos */}
-        <motion.div
-          variants={item}
-          initial="hidden"
-          animate="show"
-          className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8"
-        >
-          {/* Distribuição */}
-          <div className="bg-white rounded-2xl p-6 shadow-lg border border-violet-100">
-            <h3 className="text-lg font-semibold text-violet-900 mb-4">
-              Distribuição dos Empréstimos
-            </h3>
-            <ResponsiveContainer width="100%" height={250}>
-              <PieChart>
-                <Pie
-                  data={mockData.graficos.distribuicao}
-                  cx="50%"
-                  cy="50%"
-                  outerRadius={80}
-                  dataKey="value"
-                  label
-                >
-                  {mockData.graficos.distribuicao.map((_, index) => (
-                    <Cell key={index} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Pie>
-                <Legend />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-
-          {/* Histórico */}
-          <div className="bg-white rounded-2xl p-6 shadow-lg border border-violet-100">
-            <h3 className="text-lg font-semibold text-violet-900 mb-4">
-              Histórico de Pagamentos
-            </h3>
-            <ResponsiveContainer width="100%" height={250}>
-              <LineChart data={mockData.graficos.historicoPagamentos}>
-                <XAxis dataKey="mes" />
-                <YAxis />
-                <Tooltip />
-                <Line
-                  type="monotone"
-                  dataKey="valor"
-                  stroke="#7C3AED"
-                  strokeWidth={2}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-
-          {/* Comparativo */}
-          <div className="bg-white rounded-2xl p-6 shadow-lg border border-violet-100">
-            <h3 className="text-lg font-semibold text-violet-900 mb-4">
-              Comparativo: Emprestado x Pago
-            </h3>
-            <ResponsiveContainer width="100%" height={250}>
-              <BarChart data={mockData.graficos.comparativo}>
-                <XAxis dataKey="nome" />
-                <YAxis />
-                <Tooltip />
-                <Legend />
-                <Bar dataKey="emprestado" fill="#7C3AED" />
-                <Bar dataKey="pago" fill="#22C55E" />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </motion.div>
-
-        {/* Ações rápidas */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-          <button className="bg-violet-700 hover:bg-violet-800 text-white font-semibold py-4 rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg">
-            <Calculator className="w-5 h-5" />
-            Simular Empréstimo
-          </button>
-          <button className="bg-white hover:bg-violet-50 text-violet-900 font-semibold py-4 rounded-xl border-2 border-violet-200 flex items-center justify-center gap-2 shadow-lg">
-            <TrendingUp className="w-5 h-5" />
-            Antecipar Parcela
-          </button>
-          <button className="bg-white hover:bg-violet-50 text-violet-900 font-semibold py-4 rounded-xl border-2 border-violet-200 flex items-center justify-center gap-2 shadow-lg">
-            <TrendingDown className="w-5 h-5" />
-            Quitar Empréstimo
-          </button>
+                    </td>
+                    <td className="py-4 px-4 font-semibold text-gray-800">
+                      R$ {emp.valor.toLocaleString("pt-BR")}
+                    </td>
+                    <td className="py-4 px-4 text-gray-600">
+                      R$ {emp.pago.toLocaleString("pt-BR")}
+                    </td>
+                    <td className="py-4 px-4 text-gray-600">{emp.juros}%</td>
+                    <td className="py-4 px-4">
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-violet-600 rounded-full transition-all"
+                            style={{ width: `${progresso}%` }}
+                          ></div>
+                        </div>
+                        <span className="text-xs font-semibold text-gray-600 w-12">
+                          {progresso.toFixed(0)}%
+                        </span>
+                      </div>
+                    </td>
+                    <td className="py-4 px-4 text-gray-600 text-sm">
+                      {emp.dataVencimento}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       </div>
+
+      {/* Modal Resgatar */}
+      {showResgatarModal && (
+        <div
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in"
+          onClick={() => setShowResgatarModal(false)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl animate-scale-in"
+          >
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-2xl font-bold text-gray-800">
+                Resgatar Dinheiro
+              </h3>
+              <button
+                onClick={() => setShowResgatarModal(false)}
+                className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            <div className="space-y-5">
+              <div className="bg-gradient-to-br from-violet-100 to-purple-100 rounded-2xl p-6 text-center">
+                <p className="text-sm text-gray-600 mb-2">Saldo Disponível</p>
+                <h2 className="text-4xl font-bold text-gray-800">
+                  R$ {saldoDisponivel.toLocaleString("pt-BR")}
+                </h2>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Dados Bancários
+                </label>
+                <div className="space-y-3">
+                  <input
+                    type="text"
+                    placeholder="Banco"
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-violet-500 focus:outline-none transition-colors"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Agência"
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-violet-500 focus:outline-none transition-colors"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Conta"
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-violet-500 focus:outline-none transition-colors"
+                  />
+                </div>
+              </div>
+
+              <button
+                onClick={handleResgatar}
+                className="w-full bg-violet-600 hover:bg-violet-700 text-white font-semibold py-4 rounded-xl transition-all flex items-center justify-center gap-2 hover:scale-105"
+              >
+                <DollarSign size={20} />
+                Confirmar Resgate
+              </button>
+
+              <p className="text-xs text-gray-500 text-center">
+                O dinheiro será transferido em até 2 dias úteis
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <style jsx>{`
+        @keyframes fade-in {
+          from {
+            opacity: 0;
+          }
+          to {
+            opacity: 1;
+          }
+        }
+
+        @keyframes scale-in {
+          from {
+            opacity: 0;
+            transform: scale(0.9);
+          }
+          to {
+            opacity: 1;
+            transform: scale(1);
+          }
+        }
+
+        .animate-fade-in {
+          animation: fade-in 0.2s ease-out;
+        }
+
+        .animate-scale-in {
+          animation: scale-in 0.3s ease-out;
+        }
+      `}</style>
     </div>
   );
 }

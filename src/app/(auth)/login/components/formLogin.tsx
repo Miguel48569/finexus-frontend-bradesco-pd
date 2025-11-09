@@ -17,9 +17,33 @@ export default function FormLogin() {
 
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  // Função para formatar CPF
+  const formatCPF = (value: string) => {
+    // Remove tudo que não é número
+    const numbers = value.replace(/\D/g, "");
+
+    // Aplica a máscara do CPF
+    return numbers.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4");
+  };
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+
+    if (name === "cpf") {
+      // Remove caracteres não numéricos
+      const numbersOnly = value.replace(/\D/g, "");
+
+      // Limita a 11 dígitos
+      const truncated = numbersOnly.slice(0, 11);
+
+      // Aplica a formatação
+      const formatted =
+        truncated.length === 11 ? formatCPF(truncated) : truncated;
+
+      setFormData((prev) => ({ ...prev, [name]: formatted }));
+    } else {
+      setFormData((prev) => ({ ...prev, [name]: value }));
+    }
 
     if (errors[name]) {
       setErrors((prev) => ({ ...prev, [name]: "" }));
@@ -50,33 +74,46 @@ export default function FormLogin() {
 
     setIsLoading(true);
 
-    // Simulação: Por enquanto apenas redireciona (substitua pela sua API depois)
-    setTimeout(() => {
-      console.log("Dados do login:", formData);
-      router.push("/dashboard");
-    }, 1000);
+    // Mock de usuários para simulação
+    const mockUsers: Record<
+      string,
+      { type: "MEI" | "Investidor"; password: string }
+    > = {
+      "000.000.000-00": { type: "MEI", password: "123456" },
+      "888.888.888-88": { type: "Investidor", password: "123456" },
+    };
 
-    // TODO: Quando criar a API, descomente o código abaixo:
-    /*
     try {
-      const response = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
-      });
+      // Simula verificação de login
+      setTimeout(() => {
+        // Remove formatação do CPF antes de verificar
+        const unformattedCPF = formData.cpf.replace(/\D/g, "");
+        const formattedCPF = formatCPF(unformattedCPF);
+        const user = mockUsers[formattedCPF];
 
-      if (response.ok) {
-        router.push("/home");
-      } else {
-        const data = await response.json();
-        setErrors({ submit: data.message || "CPF ou senha incorretos" });
-      }
-    } catch (error) {
+        if (!user || user.password !== formData.senha) {
+          setErrors({ submit: "CPF ou senha incorretos" });
+          setIsLoading(false);
+          return;
+        }
+
+        // Salva o tipo de perfil no localStorage
+        localStorage.setItem("userProfile", user.type);
+
+        // Redireciona baseado no tipo de usuário
+        if (user.type === "MEI") {
+          router.push("/dashboard");
+        } else {
+          router.push("/carteira");
+        }
+
+        // garante que o estado de loading seja desligado após todo o fluxo
+        setIsLoading(false);
+      }, 1000);
+    } catch {
       setErrors({ submit: "Erro ao conectar com o servidor" });
-    } finally {
       setIsLoading(false);
     }
-    */
   };
 
   return (

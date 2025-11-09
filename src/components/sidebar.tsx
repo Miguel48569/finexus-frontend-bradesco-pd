@@ -24,6 +24,7 @@ interface SidebarProps {
   onClose: () => void;
   isCollapsed: boolean;
   onToggleCollapse: () => void;
+  userType?: "MEI" | "Investidor";
 }
 
 export default function Sidebar({
@@ -33,26 +34,48 @@ export default function Sidebar({
   onClose,
   isCollapsed,
   onToggleCollapse,
+  userType = "MEI",
 }: SidebarProps) {
   const pathname = usePathname();
 
-  const menuItems = [
-    { id: "dashboard", label: "Dashboard", icon: Home, route: "/dashboard" },
-    { id: "extrato", label: "Extrato", icon: DollarSign, route: "/extrato" },
-    {
-      id: "contratos",
-      label: "Contratos",
-      icon: FileCheck,
-      route: "/contratos",
-    },
-    { id: "perfil", label: "Meu Perfil", icon: User, route: "/perfil" },
-    {
-      id: "settings",
-      label: "Configurações",
-      icon: Settings,
-      route: "/settings",
-    },
-  ];
+  const getMenuItems = () => {
+    const commonItems = [
+      { id: "extrato", label: "Extrato", icon: DollarSign, route: "/extrato" },
+      {
+        id: "contratos",
+        label: "Contratos",
+        icon: FileCheck,
+        route: "/contratos",
+      },
+      { id: "perfil", label: "Meu Perfil", icon: User, route: "/perfil" },
+      {
+        id: "settings",
+        label: "Configurações",
+        icon: Settings,
+        route: "/settings",
+      },
+    ];
+
+    if (userType === "Investidor") {
+      return [
+        { id: "carteira", label: "Carteira", icon: Home, route: "/carteira" },
+        {
+          id: "marketplace",
+          label: "Marketplace",
+          icon: DollarSign,
+          route: "/marketplace",
+        },
+        ...commonItems,
+      ];
+    }
+
+    return [
+      { id: "dashboard", label: "Dashboard", icon: Home, route: "/dashboard" },
+      ...commonItems,
+    ];
+  };
+
+  const menuItems = getMenuItems();
 
   // Atualiza o item ativo baseado na URL atual
   React.useEffect(() => {
@@ -60,7 +83,8 @@ export default function Sidebar({
     if (currentItem) {
       onRouteChange(currentItem.id);
     }
-  }, [pathname]);
+    // menuItems e onRouteChange são incluídos nas deps para satisfazer o eslint
+  }, [pathname, menuItems, onRouteChange]);
 
   return (
     <>

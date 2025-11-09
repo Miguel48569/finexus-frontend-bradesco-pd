@@ -48,3 +48,18 @@ a {
     color-scheme: dark;
   }
 }
+
+@keyframes shine {
+  0% {
+    background-position: 200% center;
+  }
+  100% {
+    background-position: -200% center;
+  }
+}
+
+.button-glow {
+  background: linear-gradient(90deg, #6d28d9, #a78bfa, #6d28d9);
+  background-size: 200%;
+  animation: shine 3s linear infinite;
+}
