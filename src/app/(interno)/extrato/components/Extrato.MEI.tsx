@@ -163,9 +163,11 @@ export default function ExtratoMEI() {
   const [filtroTipo, setFiltroTipo] = useState<"todos" | "entrada" | "saida">(
     "todos"
   );
-  const [filtroStatus, setFiltroStatus] = useState<string>("todos");
-  const [busca, setBusca] = useState("");
-  const [periodo, setPeriodo] = useState("30");
+  const [filtroStatus, setFiltroStatus] = useState<
+    "todos" | Transacao["status"]
+  >("todos");
+  const [busca, setBusca] = useState<string>("");
+  const [periodo, setPeriodo] = useState<"7" | "30" | "90" | "365">("30");
 
   const totalEntradas = transacoes
     .filter((t) => t.tipo === "entrada" && t.status === "Concluído")
@@ -324,15 +326,17 @@ export default function ExtratoMEI() {
                 placeholder="Buscar transação..."
                 value={busca}
                 onChange={(e) => setBusca(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:border-violet-500 focus:outline-none transition-all text-sm"
+                className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:border-violet-500 focus:outline-none transition-all text-sm text-gray-700 placeholder-gray-400"
               />
             </div>
 
             {/* Filtro Tipo */}
             <select
               value={filtroTipo}
-              onChange={(e) => setFiltroTipo(e.target.value as any)}
-              className="px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:border-violet-500 focus:outline-none transition-all text-sm font-medium"
+              onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
+                setFiltroTipo(e.target.value as "todos" | "entrada" | "saida")
+              }
+              className="px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:border-violet-500 focus:outline-none transition-all text-sm font-medium text-gray-700 appearance-none"
             >
               <option value="todos">Todos os tipos</option>
               <option value="entrada">Entradas</option>
@@ -342,8 +346,10 @@ export default function ExtratoMEI() {
             {/* Filtro Status */}
             <select
               value={filtroStatus}
-              onChange={(e) => setFiltroStatus(e.target.value)}
-              className="px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:border-violet-500 focus:outline-none transition-all text-sm font-medium"
+              onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
+                setFiltroStatus(e.target.value as "todos" | Transacao["status"])
+              }
+              className="px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:border-violet-500 focus:outline-none transition-all text-sm font-medium text-gray-700 appearance-none"
             >
               <option value="todos">Todos os status</option>
               <option value="Concluído">Concluído</option>
@@ -354,8 +360,10 @@ export default function ExtratoMEI() {
             {/* Período */}
             <select
               value={periodo}
-              onChange={(e) => setPeriodo(e.target.value)}
-              className="px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:border-violet-500 focus:outline-none transition-all text-sm font-medium"
+              onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
+                setPeriodo(e.target.value as "7" | "30" | "90" | "365")
+              }
+              className="px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:border-violet-500 focus:outline-none transition-all text-sm font-medium text-gray-700 appearance-none"
             >
               <option value="7">Últimos 7 dias</option>
               <option value="30">Últimos 30 dias</option>
