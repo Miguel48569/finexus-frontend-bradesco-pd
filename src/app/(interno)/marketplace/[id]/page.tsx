@@ -514,7 +514,7 @@ export default function DetalhesInvestimentoPage() {
                       pattern="[0-9.,]*"
                       value={valorSimulacao}
                       onChange={(e: ChangeEvent<HTMLInputElement>) => {
-                        let raw = e.target.value.replace(/[^\d]/g, "");
+                        const raw = e.target.value.replace(/[^\d]/g, "");
                         if (raw.length === 0) {
                           setValorSimulacao("");
                           setErroMinimo("");
