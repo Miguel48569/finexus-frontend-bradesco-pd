@@ -26,7 +26,17 @@ interface Emprestimo {
   dataSolicitacao: string;
 }
 
-const emprestimos: Emprestimo[] = [
+function getEmprestimosMockados() {
+  if (typeof window === "undefined") return [];
+  try {
+    const salvos = localStorage.getItem("emprestimosMock");
+    return salvos ? JSON.parse(salvos) : [];
+  } catch {
+    return [];
+  }
+}
+
+const emprestimosFixos: Emprestimo[] = [
   {
     id: 1,
     empresa: "Cafeteria Aroma Bom",
@@ -69,6 +79,14 @@ const emprestimos: Emprestimo[] = [
   },
 ];
 
+function useEmprestimosComMock() {
+  const [mockados, setMockados] = React.useState<Emprestimo[]>([]);
+  React.useEffect(() => {
+    setMockados(getEmprestimosMockados());
+  }, []);
+  return [...emprestimosFixos, ...mockados];
+}
+
 const historicoMensal = [
   { mes: "Jan", valor: 0 },
   { mes: "Fev", valor: 0 },
@@ -89,6 +107,7 @@ export default function DashboardMEI() {
   const [showResgatarModal, setShowResgatarModal] = useState(false);
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
 
+  const emprestimos = useEmprestimosComMock();
   const saldoDisponivel = 17000;
   const saldoBloqueado = 9500;
   const totalRecebido = 26500;
