@@ -147,7 +147,7 @@ export default function FormLogin() {
               value={formData.cpf}
               onChange={handleChange}
               placeholder="000.000.000-00"
-              className={`block w-full rounded-lg border-transparent bg-slate-100 py-2.5 sm:py-3 pl-9 sm:pl-10 pr-3 text-sm sm:text-base text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-500 ${
+              className={`block w-full rounded-lg border border-gray-200 shadow-sm bg-slate-100 py-2.5 sm:py-3 pl-9 sm:pl-10 pr-3 text-sm sm:text-base text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-500 ${
                 errors.cpf ? "ring-2 ring-red-500" : ""
               }`}
             />
@@ -176,7 +176,7 @@ export default function FormLogin() {
               value={formData.senha}
               onChange={handleChange}
               placeholder="••••••••"
-              className={`block w-full rounded-lg border-transparent bg-slate-100 py-2.5 sm:py-3 pl-9 sm:pl-10 pr-10 text-sm sm:text-base text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-500 ${
+              className={`block w-full rounded-lg border border-gray-200 shadow-sm bg-slate-100 py-2.5 sm:py-3 pl-9 sm:pl-10 pr-10 text-sm sm:text-base text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-500 ${
                 errors.senha ? "ring-2 ring-red-500" : ""
               }`}
             />

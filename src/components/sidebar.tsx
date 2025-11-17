@@ -69,8 +69,15 @@ export default function Sidebar({
       ];
     }
 
+    // Usuário MEI: adicionar "Solicitar Empréstimo"
     return [
       { id: "dashboard", label: "Dashboard", icon: Home, route: "/dashboard" },
+      {
+        id: "solicitar-emprestimo",
+        label: "Solicitar Empréstimo",
+        icon: DollarSign,
+        route: "/solicitar-emprestimo",
+      },
       ...commonItems,
     ];
   };

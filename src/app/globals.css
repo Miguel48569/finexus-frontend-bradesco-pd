@@ -51,15 +51,30 @@ a {
 
 @keyframes shine {
   0% {
-    background-position: 200% center;
+    background-position: 0% 50%;
   }
   100% {
-    background-position: -200% center;
+    background-position: 200% 50%;
   }
 }
 
-.button-glow {
-  background: linear-gradient(90deg, #6d28d9, #a78bfa, #6d28d9);
-  background-size: 200%;
-  animation: shine 3s linear infinite;
+@layer components {
+  .button-glow {
+    @apply bg-gradient-to-r from-purple-700 via-purple-400 to-purple-700;
+    @apply bg-[length:200%_auto];
+    @apply animate-[shine_3s_linear_infinite];
+    @apply px-4 py-2 rounded block mt-6;
+  }
+}
+
+/* Esconde as setas padrão no Chrome, Safari, Edge */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* Esconde as setas padrão no Firefox */
+input[type="number"] {
+  -moz-appearance: textfield;
 }

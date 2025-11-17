@@ -1,20 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import {
-  TrendingUp,
-  Wallet,
-  DollarSign,
-  ArrowRight,
-  CheckCircle,
-  Plus,
-  ArrowUpRight,
-  Clock,
-  AlertCircle,
-  X,
-  ArrowDown,
-  ArrowUp,
-} from "lucide-react";
+import { TrendingUp, DollarSign, CheckCircle, X } from "lucide-react";
 import {
   PieChart,
   Pie,
@@ -109,7 +96,6 @@ export default function DashboardMEI() {
   const variacao = 37.8;
   const variacaoValor = 21589.99;
   const emprestimosAtivos = emprestimos.filter((e) => e.status === "Ativo");
-  const proximoVencimento = emprestimosAtivos[0]?.dataVencimento || "Nenhum";
 
   const dadosPizza = emprestimos
     .filter((e) => e.status === "Ativo")
@@ -117,10 +103,6 @@ export default function DashboardMEI() {
       name: e.empresa,
       value: e.valor,
     }));
-
-  const handleSolicitarInvestimento = () => {
-    console.log("Navegar para tela de solicitação");
-  };
 
   const handleResgatar = () => {
     setShowResgatarModal(false);
@@ -142,8 +124,8 @@ export default function DashboardMEI() {
         )}
 
         {/* Header com Portfolio Total */}
-        <div className="bg-gradient-to-br from-violet-600 to-purple-700 rounded-3xl p-8 mb-8 text-white shadow-xl">
-          <div className="flex items-start justify-between">
+        <div className="bg-gradient-to-br from-violet-600 to-purple-700 rounded-3xl p-8 mb-8 text-white shadow-xl shadow-violet-500/50">
+          <div className="flex justify-between items-center">
             <div className="flex-1">
               <p className="text-violet-200 mb-2 text-sm">Portfolio Total</p>
               <h1 className="text-5xl font-bold mb-2">
@@ -160,16 +142,8 @@ export default function DashboardMEI() {
             {/* Botões de Ação - Estilo Banking */}
             <div className="flex gap-3">
               <button
-                onClick={handleSolicitarInvestimento}
-                className="flex items-center gap-2 px-6 py-3 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-xl font-semibold transition-all border border-white/20 hover:border-white/40"
-              >
-                <Plus size={20} />
-                Solicitar
-              </button>
-
-              <button
                 onClick={() => setShowResgatarModal(true)}
-                className="flex items-center gap-2 px-6 py-3 bg-white text-violet-600 hover:bg-violet-50 rounded-xl font-semibold transition-all shadow-lg hover:shadow-xl"
+                className="flex items-center gap-2 px-8 py-4 bg-white text-violet-600 hover:bg-violet-50 rounded-xl font-semibold transition-all shadow-lg hover:shadow-xl hover:scale-105"
               >
                 <DollarSign size={20} />
                 Resgatar
@@ -450,27 +424,48 @@ export default function DashboardMEI() {
                     Dados Bancários
                   </label>
                   <div className="space-y-3">
+                    <label
+                      htmlFor="banco"
+                      className="text-gray-700 text-sm block font-medium mb-2"
+                    >
+                      Banco
+                    </label>
                     <input
+                      id="banco"
                       type="text"
                       placeholder="Banco"
-                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-violet-500 focus:outline-none transition-colors"
+                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-violet-500 focus:outline-none transition-colors text-gray-800 placeholder-gray-400 bg-slate-100"
                     />
+                    <label
+                      htmlFor="agencia"
+                      className="text-gray-700 text-sm block font-medium mb-2"
+                    >
+                      Agência
+                    </label>
                     <input
+                      id="agencia"
                       type="text"
                       placeholder="Agência"
-                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-violet-500 focus:outline-none transition-colors"
+                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-violet-500 focus:outline-none transition-colors placeholder-gray-400 bg-slate-100 text-gray-800"
                     />
+                    <label
+                      htmlFor="conta"
+                      className="text-gray-700 text-sm block font-medium mb-2"
+                    >
+                      Conta
+                    </label>
                     <input
+                      id="conta"
                       type="text"
                       placeholder="Conta"
-                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-violet-500 focus:outline-none transition-colors"
+                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-violet-500 focus:outline-none transition-colors placeholder-gray-400 bg-slate-100 text-gray-800"
                     />
                   </div>
                 </div>
 
                 <button
                   onClick={handleResgatar}
-                  className="w-full bg-violet-600 hover:bg-violet-700 text-white font-semibold py-4 rounded-xl transition-all flex items-center justify-center gap-2 hover:scale-105"
+                  className="w-full bg-violet-600 hover:bg-violet-700 text-white font-semibold py-4 rounded-xl transition-all flex items-center justify-center gap-2 hover:scale-105 button-glow"
                 >
                   <DollarSign size={20} />
                   Confirmar Resgate
