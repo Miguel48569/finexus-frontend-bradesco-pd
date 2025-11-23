@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Eye, EyeOff, User, Lock } from "lucide-react";
+import { ArrowLeft, Eye, EyeOff, User, Lock, AlertCircle } from "lucide-react";
+import { userService } from "@/services/users";
 
 interface SignupFormProps {
   userType: "mei" | "investidor";
@@ -26,9 +27,44 @@ export default function SignupForm({ userType, onBack }: SignupFormProps) {
 
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  // Função para formatar CPF
+  const formatCPF = (value: string) => {
+    const numbers = value.replace(/\D/g, "");
+    return numbers
+      .slice(0, 11)
+      .replace(/(\d{3})(\d)/, "$1.$2")
+      .replace(/(\d{3})(\d)/, "$1.$2")
+      .replace(/(\d{3})(\d{1,2})$/, "$1-$2");
+  };
+
+  // Função para formatar Telefone
+  const formatTelefone = (value: string) => {
+    const numbers = value.replace(/\D/g, "");
+    if (numbers.length <= 10) {
+      return numbers
+        .slice(0, 10)
+        .replace(/(\d{2})(\d)/, "($1) $2")
+        .replace(/(\d{4})(\d)/, "$1-$2");
+    } else {
+      return numbers
+        .slice(0, 11)
+        .replace(/(\d{2})(\d)/, "($1) $2")
+        .replace(/(\d{5})(\d)/, "$1-$2");
+    }
+  };
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+
+    if (name === "cpf") {
+      const formatted = formatCPF(value);
+      setFormData((prev) => ({ ...prev, [name]: formatted }));
+    } else if (name === "telefone") {
+      const formatted = formatTelefone(value);
+      setFormData((prev) => ({ ...prev, [name]: formatted }));
+    } else {
+      setFormData((prev) => ({ ...prev, [name]: value }));
+    }
 
     if (errors[name]) {
       setErrors((prev) => ({ ...prev, [name]: "" }));
@@ -62,7 +98,9 @@ export default function SignupForm({ userType, onBack }: SignupFormProps) {
       newErrors.senha = "Senha deve ter no mínimo 6 caracteres";
     }
 
-    if (formData.senha !== formData.confirmarSenha) {
+    if (!formData.confirmarSenha) {
+      newErrors.confirmarSenha = "Confirme a senha";
+    } else if (formData.senha !== formData.confirmarSenha) {
       newErrors.confirmarSenha = "As senhas não coincidem";
     }
 
@@ -79,36 +117,75 @@ export default function SignupForm({ userType, onBack }: SignupFormProps) {
 
     setIsLoading(true);
 
-    // Simulação: Por enquanto apenas redireciona (substitua pela sua API depois)
-    setTimeout(() => {
-      console.log("Dados do cadastro:", { ...formData, userType });
-      router.push("/login");
-    }, 1000);
-
-    // TODO: Quando criar a API, descomente o código abaixo:
-    /*
     try {
-      const response = await fetch("/api/auth/signup", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...formData,
-          userType,
-        }),
+      console.log("🔄 Iniciando cadastro...", {
+        tipo: userType === "mei" ? "MEI" : "INVESTIDOR",
       });
 
-      if (response.ok) {
-        router.push("/login");
+      // Remove formatação do telefone antes de enviar
+      const telefoneLimpo = formData.telefone.replace(/\D/g, "");
+
+      const dadosCadastro = {
+        nome: formData.nome,
+        email: formData.email,
+        cpf: formData.cpf,
+        telefone: telefoneLimpo,
+        senha: formData.senha,
+        confirmarSenha: formData.confirmarSenha,
+        tipo: userType === "mei" ? "TOMADOR" : "INVESTIDOR",
+      };
+
+      console.log("📤 Dados enviados:", dadosCadastro);
+
+      await userService.cadastro(dadosCadastro);
+
+      console.log("✅ Cadastro realizado com sucesso!");
+      router.push("/login");
+    } catch (error: any) {
+      console.error("❌ Erro no cadastro:", {
+        status: error?.response?.status,
+        statusText: error?.response?.statusText,
+        data: error?.response?.data,
+        message: error?.message,
+      });
+
+      let mensagem = "Erro ao cadastrar. Tente novamente.";
+
+      if (error?.response) {
+        // Erro com resposta do servidor
+        const status = error.response.status;
+        const backendMessage = error.response.data?.message;
+
+        if (status === 400) {
+          mensagem =
+            backendMessage || "Dados inválidos. Verifique as informações.";
+        } else if (status === 409) {
+          mensagem = backendMessage || "Este email ou CPF já está cadastrado.";
+        } else if (status === 500) {
+          mensagem = "Erro no servidor. Tente novamente em alguns instantes.";
+        } else {
+          mensagem =
+            backendMessage || `Erro ${status}: ${error.response.statusText}`;
+        }
+      } else if (error?.request) {
+        // Requisição feita mas sem resposta - pode ser CORS
+        if (error?.message?.includes("Network Error")) {
+          mensagem =
+            "❌ Erro de CORS: O backend está bloqueando requisições do frontend. Configure CORS no backend para permitir: " +
+            window.location.origin;
+        } else {
+          mensagem =
+            "Sem resposta do servidor. Verifique sua conexão com a internet.";
+        }
       } else {
-        const data = await response.json();
-        setErrors({ submit: data.message || "Erro ao cadastrar" });
+        // Erro ao configurar a requisição
+        mensagem = error?.message || "Erro desconhecido ao tentar cadastrar.";
       }
-    } catch (error) {
-      setErrors({ submit: "Erro ao conectar com o servidor" });
+
+      setErrors({ submit: mensagem });
     } finally {
       setIsLoading(false);
     }
-    */
   };
 
   const isMei = userType === "mei";
@@ -237,7 +314,8 @@ export default function SignupForm({ userType, onBack }: SignupFormProps) {
               htmlFor="telefone"
               className="block text-xs sm:text-sm font-semibold text-gray-700 mb-1"
             >
-              Seu Telefone <span className="text-red-500">*</span>
+              Seu Telefone{" "}
+              <span className="text-gray-400 font-normal">(opcional)</span>
             </label>
             <div className="relative">
               <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
@@ -311,7 +389,8 @@ export default function SignupForm({ userType, onBack }: SignupFormProps) {
             htmlFor="confirmarSenha"
             className="block text-xs sm:text-sm font-semibold text-gray-700 mb-1"
           >
-            Confirmar Senha <span className="text-red-500">*</span>
+            Confirmar Senha{" "}
+            <span className="text-gray-400 font-normal">(opcional)</span>
           </label>
           <div className="relative">
             <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
@@ -349,8 +428,14 @@ export default function SignupForm({ userType, onBack }: SignupFormProps) {
 
         {/* Erro geral de submit */}
         {errors.submit && (
-          <div className="p-2.5 sm:p-3 bg-red-50 border border-red-200 rounded-lg">
-            <p className="text-xs sm:text-sm text-red-600">{errors.submit}</p>
+          <div className="p-3 sm:p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
+            <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="text-xs sm:text-sm font-semibold text-red-700 mb-1">
+                Erro no cadastro
+              </p>
+              <p className="text-xs sm:text-sm text-red-600">{errors.submit}</p>
+            </div>
           </div>
         )}
 

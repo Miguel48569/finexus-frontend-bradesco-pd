@@ -3,6 +3,17 @@
 import { useState, FormEvent, ChangeEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { userService } from "@/services/users";
+import Image from "next/image";
+import {
+  User,
+  Lock,
+  Eye,
+  EyeOff,
+  ArrowLeft,
+  AlertCircle,
+  CheckCircle2,
+} from "lucide-react";
 
 // ============================================
 // 1. TIPOS E INTERFACES (Type Safety)
@@ -37,43 +48,13 @@ const formatarCPF = (valor: string): string => {
 
 const validarCPF = (cpf: string): boolean => {
   const numeros = cpf.replace(/\D/g, "");
-
-  // Verifica se tem 11 dígitos e não é sequência repetida
-  if (numeros.length !== 11 || /^(\d)\1+$/.test(numeros)) {
-    return false;
-  }
-
-  // Aqui você poderia adicionar validação completa do CPF
-  // (cálculo dos dígitos verificadores)
-  return true;
-};
-
-const validarSenha = (
-  senha: string
-): { valida: boolean; mensagem?: string } => {
-  if (senha.length < 8) {
-    return { valida: false, mensagem: "Senha deve ter no mínimo 8 caracteres" };
-  }
-
-  if (!/[A-Z]/.test(senha)) {
-    return {
-      valida: false,
-      mensagem: "Senha deve conter ao menos 1 letra maiúscula",
-    };
-  }
-
-  if (!/[0-9]/.test(senha)) {
-    return { valida: false, mensagem: "Senha deve conter ao menos 1 número" };
-  }
-
-  return { valida: true };
+  // Apenas verifica se tem 11 dígitos
+  return numeros.length === 11;
 };
 
 // ============================================
 // 3. COMPONENTE PRINCIPAL
 // ============================================
-import Image from "next/image";
-import { User, Lock, Eye, EyeOff, ArrowLeft } from "lucide-react";
 
 export default function EsqueciSenhaPage() {
   const router = useRouter();
@@ -88,6 +69,7 @@ export default function EsqueciSenhaPage() {
   const [errors, setErrors] = useState<FormErrors>({});
   const [isLoading, setIsLoading] = useState(false);
   const [mostrarSenha, setMostrarSenha] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
 
   // Handler unificado para todos os inputs (DRY - Don't Repeat Yourself)
   const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
@@ -104,46 +86,25 @@ export default function EsqueciSenhaPage() {
   // Validação completa do formulário
   const validarFormulario = (): boolean => {
     const novosErros: FormErrors = {};
+
     if (!formData.cpf) {
       novosErros.cpf = "CPF é obrigatório";
     } else if (!validarCPF(formData.cpf)) {
       novosErros.cpf = "CPF inválido";
     }
+
     if (!formData.senha) {
       novosErros.senha = "Senha é obrigatória";
-    } else {
-      const resultadoValidacao = validarSenha(formData.senha);
-      if (!resultadoValidacao.valida) {
-        novosErros.senha = resultadoValidacao.mensagem;
-      }
     }
+
     if (!formData.confirmarSenha) {
-      novosErros.confirmarSenha = "Confirmação é obrigatória";
+      novosErros.confirmarSenha = "Confirme a senha";
     } else if (formData.senha !== formData.confirmarSenha) {
       novosErros.confirmarSenha = "As senhas não coincidem";
     }
+
     setErrors(novosErros);
     return Object.keys(novosErros).length === 0;
-  };
-
-  // Chamada à API (integração com backend)
-  const redefinirSenha = async (cpf: string, novaSenha: string) => {
-    const cpfLimpo = cpf.replace(/\D/g, "");
-    const response = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL}/usuarios/${cpfLimpo}`,
-      {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ senha: novaSenha }),
-      }
-    );
-    if (!response.ok) {
-      const erro = await response.json();
-      throw new Error(erro.message || "Erro ao redefinir senha");
-    }
-    return response.json();
   };
 
   // Submit do formulário
@@ -152,17 +113,92 @@ export default function EsqueciSenhaPage() {
     if (!validarFormulario()) {
       return;
     }
+
     setIsLoading(true);
+
     try {
-      await redefinirSenha(formData.cpf, formData.senha);
-      alert("Senha redefinida com sucesso!");
-      router.push("/login");
-    } catch (erro: unknown) {
-      const mensagemErro =
-        erro instanceof Error
-          ? erro.message
-          : "Erro ao redefinir senha. Tente novamente.";
-      setErrors({ geral: mensagemErro });
+      console.log("🔄 Buscando usuário pelo CPF...", {
+        cpf: formData.cpf,
+        url: `/usuarios/cpf/${formData.cpf}`,
+      });
+
+      // 1. Busca o usuário pelo CPF para pegar o ID
+      const usuario = await userService.getByCpf(formData.cpf);
+      console.log("✅ Usuário encontrado:", {
+        id: usuario.id,
+        nome: usuario.nome,
+      });
+
+      // 2. Atualiza a senha usando o ID
+      console.log("🔄 Atualizando senha...");
+      const dadosAtualizacao = {
+        senha: formData.senha,
+        confirmarSenha: formData.confirmarSenha,
+      };
+      console.log("📤 Dados enviados:", dadosAtualizacao);
+
+      await userService.update(usuario.id, dadosAtualizacao);
+
+      console.log("✅ Senha redefinida com sucesso!");
+      setShowSuccess(true);
+
+      // Redireciona após 2 segundos para o usuário ver a mensagem
+      setTimeout(() => {
+        router.push("/login");
+      }, 2000);
+    } catch (error) {
+      const err = error as {
+        response?: {
+          status?: number;
+          statusText?: string;
+          data?: { message?: string };
+        };
+        request?: unknown;
+        message?: string;
+      };
+
+      console.error("❌ Erro ao redefinir senha:", {
+        status: err?.response?.status,
+        statusText: err?.response?.statusText,
+        data: err?.response?.data,
+        message: err?.message,
+        url: `/usuarios/cpf/${formData.cpf}`,
+      });
+
+      let mensagem = "Erro ao redefinir senha. Tente novamente.";
+
+      if (err?.response) {
+        const status = err.response.status;
+        const backendMessage = err.response.data?.message;
+
+        if (status === 404) {
+          mensagem =
+            backendMessage ||
+            "CPF não encontrado no sistema. Verifique se está cadastrado.";
+        } else if (status === 401) {
+          mensagem =
+            "Senha atual incorreta. Digite a senha atual corretamente.";
+        } else if (status === 400) {
+          mensagem =
+            backendMessage || "Dados inválidos. Verifique as informações.";
+        } else if (status === 500) {
+          mensagem = "Erro no servidor. Tente novamente em alguns instantes.";
+        } else {
+          mensagem =
+            backendMessage || `Erro ${status}: ${err.response.statusText}`;
+        }
+      } else if (err?.request) {
+        if (err?.message?.includes("Network Error")) {
+          mensagem =
+            "❌ Erro de conexão: Verifique sua internet ou tente mais tarde.";
+        } else {
+          mensagem = "Sem resposta do servidor. Verifique sua conexão.";
+        }
+      } else {
+        mensagem = err?.message || "Erro desconhecido ao redefinir senha.";
+      }
+
+      setErrors({ geral: mensagem });
     } finally {
       setIsLoading(false);
     }
@@ -193,16 +229,39 @@ export default function EsqueciSenhaPage() {
                 Redefinir Senha
               </h1>
               <p className="text-gray-600 text-sm">
-                Digite seu CPF e escolha uma nova senha
+                Digite seu CPF e sua senha atual para criar uma nova senha
               </p>
             </div>
 
             {/* Formulário */}
             <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-5">
+              {/* Mensagem de Sucesso */}
+              {showSuccess && (
+                <div className="p-3 sm:p-4 bg-green-50 border border-green-200 rounded-lg flex items-start gap-3 animate-pulse">
+                  <CheckCircle2 className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="text-xs sm:text-sm font-semibold text-green-700 mb-1">
+                      Senha redefinida com sucesso!
+                    </p>
+                    <p className="text-xs sm:text-sm text-green-600">
+                      Redirecionando para o login...
+                    </p>
+                  </div>
+                </div>
+              )}
+
               {/* Erro Geral */}
               {errors.geral && (
-                <div className="p-2.5 sm:p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm flex items-center gap-2">
-                  <Lock className="w-4 h-4" /> {errors.geral}
+                <div className="p-3 sm:p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
+                  <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="text-xs sm:text-sm font-semibold text-red-700 mb-1">
+                      Erro ao redefinir senha
+                    </p>
+                    <p className="text-xs sm:text-sm text-red-600">
+                      {errors.geral}
+                    </p>
+                  </div>
                 </div>
               )}
 
@@ -257,7 +316,7 @@ export default function EsqueciSenhaPage() {
                     name="senha"
                     value={formData.senha}
                     onChange={handleChange}
-                    placeholder="Mínimo 8 caracteres"
+                    placeholder="Digite sua nova senha"
                     className={`block w-full rounded-lg border border-gray-200 shadow-sm bg-slate-100 py-2.5 sm:py-3 pl-9 sm:pl-10 pr-10 text-sm sm:text-base text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-500 ${
                       errors.senha ? "ring-2 ring-red-500" : ""
                     }`}
@@ -280,9 +339,6 @@ export default function EsqueciSenhaPage() {
                     {errors.senha}
                   </p>
                 )}
-                <p className="mt-1 text-xs text-gray-500">
-                  Use no mínimo 8 caracteres com letras maiúsculas e números
-                </p>
               </div>
 
               {/* Campo Confirmar Senha */}
@@ -327,6 +383,21 @@ export default function EsqueciSenhaPage() {
                   </p>
                 )}
               </div>
+
+              {/* Erro geral de submit */}
+              {errors.geral && (
+                <div className="p-3 sm:p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
+                  <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="text-xs sm:text-sm font-semibold text-red-700 mb-1">
+                      Erro ao redefinir senha
+                    </p>
+                    <p className="text-xs sm:text-sm text-red-600">
+                      {errors.geral}
+                    </p>
+                  </div>
+                </div>
+              )}
 
               {/* Botão Submit */}
               <button
