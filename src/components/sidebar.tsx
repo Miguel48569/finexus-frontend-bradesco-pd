@@ -13,6 +13,7 @@ import {
   X,
   ChevronLeft,
   ChevronRight,
+  CreditCard,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -24,7 +25,7 @@ interface SidebarProps {
   onClose: () => void;
   isCollapsed: boolean;
   onToggleCollapse: () => void;
-  userType?: "MEI" | "Investidor";
+  userType?: "TOMADOR" | "INVESTIDOR";
 }
 
 export default function Sidebar({
@@ -34,19 +35,13 @@ export default function Sidebar({
   onClose,
   isCollapsed,
   onToggleCollapse,
-  userType = "MEI",
+  userType = "TOMADOR",
 }: SidebarProps) {
   const pathname = usePathname();
 
   const getMenuItems = () => {
     const commonItems = [
       { id: "extrato", label: "Extrato", icon: DollarSign, route: "/extrato" },
-      {
-        id: "contratos",
-        label: "Contratos",
-        icon: FileCheck,
-        route: "/contratos",
-      },
       { id: "perfil", label: "Meu Perfil", icon: User, route: "/perfil" },
       {
         id: "settings",
@@ -56,7 +51,7 @@ export default function Sidebar({
       },
     ];
 
-    if (userType === "Investidor") {
+    if (userType === "INVESTIDOR") {
       return [
         { id: "carteira", label: "Carteira", icon: Home, route: "/carteira" },
         {
@@ -65,11 +60,17 @@ export default function Sidebar({
           icon: DollarSign,
           route: "/marketplace",
         },
+        {
+          id: "contratos",
+          label: "Contratos",
+          icon: FileCheck,
+          route: "/contratos",
+        },
         ...commonItems,
       ];
     }
 
-    // Usuário MEI: adicionar "Solicitar Empréstimo"
+    // Usuário TOMADOR: adicionar "Solicitar Empréstimo" e "Pagamentos"
     return [
       { id: "dashboard", label: "Dashboard", icon: Home, route: "/dashboard" },
       {
@@ -77,6 +78,12 @@ export default function Sidebar({
         label: "Solicitar Empréstimo",
         icon: DollarSign,
         route: "/solicitar-emprestimo",
+      },
+      {
+        id: "pagamentos",
+        label: "Pagamentos",
+        icon: CreditCard,
+        route: "/pagamentos",
       },
       ...commonItems,
     ];
