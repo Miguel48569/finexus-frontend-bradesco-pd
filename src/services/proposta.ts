@@ -47,46 +47,49 @@ export interface AtualizarStatusRequest {
 // --- SERVIÇO ---
 
 export const propostaService = {
-  // 1. CRIAR PROPOSTA (POST /propostas)
+  // 1. Criar proposta
   criar: async (dados: PropostaRequest): Promise<PropostaResponse> => {
-    const response = await api.post("/propostas", dados);
-    return response.data;
+    const { data } = await api.post("/propostas", dados);
+    return data;
   },
 
-  // 2. LISTAR TODAS AS PROPOSTAS (GET /propostas)
+  // 2. Listar todas
   listar: async (): Promise<PropostaResponse[]> => {
-    const response = await api.get("/propostas");
-    return response.data;
+    const { data } = await api.get("/propostas");
+    return data;
   },
 
-  // 3. BUSCAR PROPOSTA POR ID (GET /propostas/{id})
+  // 3. Listar apenas abertas
+  listarAbertas: async (): Promise<PropostaResponse[]> => {
+    const { data } = await api.get("/propostas/abertas");
+    return data;
+  },
+
+  // 4. Buscar por ID
   buscarPorId: async (id: number): Promise<PropostaResponse> => {
-    const response = await api.get(`/propostas/${id}`);
-    return response.data;
+    const { data } = await api.get(`/propostas/${id}`);
+    return data;
   },
 
-  // 4. BUSCAR PROPOSTAS POR USUÁRIO (GET /propostas/usuario/{idUsuario})
-  buscarPorUsuario: async (idUsuario: number): Promise<PropostaResponse[]> => {
-    const response = await api.get(`/propostas/usuario/${idUsuario}`);
-    return response.data;
+  // 5. Buscar por usuário
+  buscarPorUsuario: async (
+    idUsuario: number
+  ): Promise<PropostaResponse[]> => {
+    const { data } = await api.get(`/propostas/usuario/${idUsuario}`);
+    return data;
   },
 
-  // 5. ATUALIZAR STATUS (PUT /propostas/{id}/status)
+  // 6. Atualizar status
   atualizarStatus: async (
     id: number,
     dados: AtualizarStatusRequest
   ): Promise<PropostaResponse> => {
-    const response = await api.put(`/propostas/${id}/status`, dados);
-    return response.data;
+    const { data } = await api.put(`/propostas/${id}/status`, dados);
+    return data;
   },
 
-  // 6. DELETAR PROPOSTA (DELETE /propostas/{id})
+  // 7. Deletar
   deletar: async (id: number): Promise<void> => {
     await api.delete(`/propostas/${id}`);
   },
-
-  listarAbertas: async (): Promise<PropostaResponse[]> => {
-  const response = await api.get("/propostas/abertas");
-  return response.data;
-},
 };
