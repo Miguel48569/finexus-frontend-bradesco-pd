@@ -27,6 +27,7 @@ export interface PropostaResponse {
   categoria: string;
   descricaoNegocio: string;
   cnpj: string;
+  taxaJuros: number;
   tempoAtuacaoMeses: number;
   faturamentoMensal: number;
   valorSolicitado: number;
@@ -83,4 +84,9 @@ export const propostaService = {
   deletar: async (id: number): Promise<void> => {
     await api.delete(`/propostas/${id}`);
   },
+
+  listarAbertas: async (): Promise<PropostaResponse[]> => {
+  const response = await api.get("/propostas/abertas");
+  return response.data;
+},
 };

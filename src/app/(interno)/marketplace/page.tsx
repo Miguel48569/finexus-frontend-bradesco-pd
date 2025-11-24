@@ -3,8 +3,9 @@
 // ============================================
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { propostaService, PropostaResponse } from "@/services/proposta";
 import {
   Search,
   ChevronDown,
@@ -16,6 +17,7 @@ import {
   Store,
   Target,
 } from "lucide-react";
+
 
 // ============================================
 // 1. TIPOS E INTERFACES
@@ -50,110 +52,7 @@ interface FilterState {
 // ============================================
 // 2. DADOS MOCK (depois virá do backend)
 // ============================================
-const MOCK_OPPORTUNITIES: Opportunity[] = [
-  {
-    id: "1",
-    meiName: "Maria Silva",
-    businessName: "Cafeteria Aroma Bom",
-    description: "Expansão da cafeteria com novos equipamentos e área externa",
-    totalValue: 50000.0,
-    currentValue: 32500.0,
-    progress: 65,
-    interestRate: 1.8,
-    duration: 36,
-    minInvestment: 1000.0,
-    risk: "Baixo",
-    type: "Empréstimo",
-    category: "Alimentação",
-    investors: 12,
-    daysLeft: 15,
-  },
-  {
-    id: "2",
-    meiName: "João Santos",
-    businessName: "Loja Fashion Style",
-    description: "Ampliação do estoque para a temporada de verão",
-    totalValue: 120000.0,
-    currentValue: 50400.0,
-    progress: 42,
-    interestRate: 1.2,
-    duration: 84,
-    minInvestment: 5000.0,
-    risk: "Baixo",
-    type: "Financiamento",
-    category: "Varejo",
-    investors: 8,
-    daysLeft: 22,
-  },
-  {
-    id: "3",
-    meiName: "Carlos Oliveira",
-    businessName: "Salão Beleza Total",
-    description: "Reforma completa e aquisição de novos equipamentos",
-    totalValue: 80000.0,
-    currentValue: 70400.0,
-    progress: 88,
-    interestRate: 1.5,
-    duration: 84,
-    minInvestment: 2000.0,
-    risk: "Muito Baixo",
-    type: "Empréstimo",
-    category: "Beleza",
-    investors: 18,
-    daysLeft: 5,
-  },
-  {
-    id: "4",
-    meiName: "Ana Costa",
-    businessName: "Delivery Express",
-    description: "Compra de veículos para expandir área de entregas",
-    totalValue: 150000.0,
-    currentValue: 34500.0,
-    progress: 23,
-    interestRate: 0.8,
-    duration: 420,
-    minInvestment: 10000.0,
-    risk: "Médio",
-    type: "Financiamento",
-    category: "Logística",
-    investors: 5,
-    daysLeft: 30,
-  },
-  {
-    id: "5",
-    meiName: "Paula Ferreira",
-    businessName: "Empório Natural",
-    description: "Abertura de nova unidade e expansão da linha de produtos",
-    totalValue: 90000.0,
-    currentValue: 45000.0,
-    progress: 50,
-    interestRate: 1.6,
-    duration: 48,
-    minInvestment: 3000.0,
-    risk: "Baixo",
-    type: "Empréstimo",
-    category: "Alimentação",
-    investors: 10,
-    daysLeft: 18,
-  },
-  {
-    id: "6",
-    meiName: "Roberto Lima",
-    businessName: "TechFix Assistência",
-    description: "Compra de equipamentos de diagnóstico e ferramentas",
-    totalValue: 60000.0,
-    currentValue: 54000.0,
-    progress: 90,
-    interestRate: 1.4,
-    duration: 36,
-    minInvestment: 2500.0,
-    risk: "Muito Baixo",
-    type: "Financiamento",
-    category: "Serviços",
-    investors: 15,
-    daysLeft: 3,
-  },
-];
+
 
 // ============================================
 // 3. FUNÇÕES AUXILIARES
@@ -185,6 +84,45 @@ const getCategoryColor = (category: string): string => {
 export default function MarketplacePage() {
   const router = useRouter();
 
+
+  const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
+const [loading, setLoading] = useState(true);
+
+
+useEffect(() => {
+  const carregarPropostas = async () => {
+    try {
+      const propostas = await propostaService.listarAbertas(); 
+      
+      const convertidas: Opportunity[] = propostas.map((p) => ({
+        id: String(p.id),
+        meiName: "MEI",
+        businessName: p.nomeNegocio,
+        description: p.descricaoNegocio,
+        totalValue: p.valorSolicitado,
+        currentValue: p.saldoInvestido,
+        progress: Math.floor((p.saldoInvestido / p.valorSolicitado) * 100),
+        interestRate: p.taxaJuros, 
+        duration: p.prazoMeses,
+        minInvestment: 100,
+        risk: "Médio",
+        type: "Empréstimo",
+        category: p.categoria,
+        investors: 0,
+        daysLeft: 30,
+      }));
+
+      setOpportunities(convertidas);
+    } catch (error) {
+      console.error("Erro ao carregar propostas:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  carregarPropostas();
+}, []);
+
   // Estados dos filtros
   const [filters, setFilters] = useState<FilterState>({
     risk: "Todos os riscos",
@@ -215,7 +153,7 @@ export default function MarketplacePage() {
   // ============================================
   // 5. LÓGICA DE FILTRAGEM
   // ============================================
-  const filteredOpportunities = MOCK_OPPORTUNITIES.filter((opp) => {
+  const filteredOpportunities = opportunities.filter((opp) => {
     // Filtro de busca
     const matchesSearch =
       filters.search === "" ||
