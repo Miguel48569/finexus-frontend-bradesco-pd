@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { TrendingUp, DollarSign, CheckCircle, X } from "lucide-react";
 import {
   PieChart,
@@ -14,6 +14,7 @@ import {
   YAxis,
   Tooltip,
 } from "recharts";
+import { propostaService, PropostaResponse } from "@/services/proposta";
 
 interface Emprestimo {
   id: number;
@@ -26,91 +27,89 @@ interface Emprestimo {
   dataSolicitacao: string;
 }
 
-function getEmprestimosMockados() {
-  if (typeof window === "undefined") return [];
-  try {
-    const salvos = localStorage.getItem("emprestimosMock");
-    return salvos ? JSON.parse(salvos) : [];
-  } catch {
-    return [];
-  }
-}
-
-const emprestimosFixos: Emprestimo[] = [
-  {
-    id: 1,
-    empresa: "Cafeteria Aroma Bom",
-    valor: 5000,
-    pago: 3000,
-    juros: 3.2,
-    status: "Ativo",
-    dataVencimento: "15/12/2025",
-    dataSolicitacao: "15/06/2025",
-  },
-  {
-    id: 2,
-    empresa: "Loja Fashion Style",
-    valor: 8000,
-    pago: 8000,
-    juros: 2.8,
-    status: "Quitado",
-    dataVencimento: "01/11/2025",
-    dataSolicitacao: "01/05/2025",
-  },
-  {
-    id: 3,
-    empresa: "Oficina AutoPro",
-    valor: 6000,
-    pago: 1500,
-    juros: 4.1,
-    status: "Ativo",
-    dataVencimento: "20/01/2026",
-    dataSolicitacao: "20/07/2025",
-  },
-  {
-    id: 4,
-    empresa: "Restaurante Sabor & Cia",
-    valor: 7500,
-    pago: 4500,
-    juros: 3.7,
-    status: "Ativo",
-    dataVencimento: "10/02/2026",
-    dataSolicitacao: "10/08/2025",
-  },
-];
-
-function useEmprestimosComMock() {
-  const [mockados, setMockados] = React.useState<Emprestimo[]>([]);
-  React.useEffect(() => {
-    setMockados(getEmprestimosMockados());
-  }, []);
-  return [...emprestimosFixos, ...mockados];
-}
-
-const historicoMensal = [
-  { mes: "Jan", valor: 0 },
-  { mes: "Fev", valor: 0 },
-  { mes: "Mar", valor: 0 },
-  { mes: "Abr", valor: 0 },
-  { mes: "Mai", valor: 8000 },
-  { mes: "Jun", valor: 13000 },
-  { mes: "Jul", valor: 19000 },
-  { mes: "Ago", valor: 26500 },
-  { mes: "Set", valor: 26500 },
-  { mes: "Out", valor: 26500 },
-  { mes: "Nov", valor: 26500 },
-];
-
-const COLORS = ["#7C3AED", "#A78BFA", "#EC4899", "#C4B5FD"];
-
 export default function DashboardMEI() {
   const [showResgatarModal, setShowResgatarModal] = useState(false);
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
+  const [emprestimos, setEmprestimos] = useState<Emprestimo[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string>("");
 
-  const emprestimos = useEmprestimosComMock();
-  const saldoDisponivel = 17000;
-  const saldoBloqueado = 9500;
-  const totalRecebido = 26500;
+  // Busca propostas do backend
+  useEffect(() => {
+    const fetchPropostas = async () => {
+      try {
+        const userId = localStorage.getItem("userId");
+        if (!userId) {
+          setError("Usuário não encontrado");
+          setLoading(false);
+          return;
+        }
+
+        console.log("🔄 Buscando propostas do usuário...", { userId });
+        const propostas = await propostaService.buscarPorUsuario(
+          parseInt(userId)
+        );
+        console.log("✅ Propostas recebidas:", propostas);
+
+        // Converte propostas do backend para formato do dashboard
+        const emprestimosConvertidos: Emprestimo[] = propostas.map((p) => ({
+          id: p.id,
+          empresa: p.nomeNegocio,
+          valor: p.valorSolicitado,
+          pago: p.saldoInvestido,
+          juros: 3.5, // Taxa padrão (pode vir do backend depois)
+          status: mapearStatus(p.status),
+          dataVencimento: calcularDataVencimento(p.prazoMeses),
+          dataSolicitacao: formatarData(p.dataCriacao),
+        }));
+
+        setEmprestimos(emprestimosConvertidos);
+      } catch (error: any) {
+        console.error("❌ Erro ao buscar propostas:", error);
+        setError("Erro ao carregar empréstimos");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchPropostas();
+  }, []);
+
+  // Função auxiliar para mapear status do backend
+  const mapearStatus = (status?: string): "Ativo" | "Quitado" | "Atrasado" => {
+    if (!status) return "Ativo";
+    const statusUpper = status.toUpperCase();
+    if (statusUpper.includes("APROVADO") || statusUpper.includes("ATIVO"))
+      return "Ativo";
+    if (statusUpper.includes("QUITADO") || statusUpper.includes("PAGO"))
+      return "Quitado";
+    if (statusUpper.includes("ATRASADO")) return "Atrasado";
+    return "Ativo";
+  };
+
+  // Função auxiliar para calcular data de vencimento
+  const calcularDataVencimento = (prazoMeses: number): string => {
+    const hoje = new Date();
+    hoje.setMonth(hoje.getMonth() + prazoMeses);
+    return hoje.toLocaleDateString("pt-BR");
+  };
+
+  // Função auxiliar para formatar data
+  const formatarData = (data?: string): string => {
+    if (!data) return new Date().toLocaleDateString("pt-BR");
+    return new Date(data).toLocaleDateString("pt-BR");
+  };
+
+  // Cálculos do dashboard
+  const saldoDisponivel = emprestimos.reduce(
+    (acc, e) => acc + (e.status === "Quitado" ? e.valor : 0),
+    0
+  );
+  const saldoBloqueado = emprestimos.reduce(
+    (acc, e) => acc + (e.status === "Ativo" ? e.valor - e.pago : 0),
+    0
+  );
+  const totalRecebido = emprestimos.reduce((acc, e) => acc + e.pago, 0);
   const portfolioTotal = saldoDisponivel + saldoBloqueado;
   const variacao = 37.8;
   const variacaoValor = 21589.99;
@@ -122,6 +121,22 @@ export default function DashboardMEI() {
       name: e.empresa,
       value: e.valor,
     }));
+
+  const historicoMensal = [
+    { mes: "Jan", valor: 0 },
+    { mes: "Fev", valor: 0 },
+    { mes: "Mar", valor: 0 },
+    { mes: "Abr", valor: 0 },
+    { mes: "Mai", valor: 0 },
+    { mes: "Jun", valor: 0 },
+    { mes: "Jul", valor: 0 },
+    { mes: "Ago", valor: 0 },
+    { mes: "Set", valor: 0 },
+    { mes: "Out", valor: 0 },
+    { mes: "Nov", valor: totalRecebido },
+  ];
+
+  const COLORS = ["#7C3AED", "#A78BFA", "#EC4899", "#C4B5FD"];
 
   const handleResgatar = () => {
     setShowResgatarModal(false);
