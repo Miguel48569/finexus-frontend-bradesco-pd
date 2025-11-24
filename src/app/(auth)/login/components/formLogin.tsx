@@ -3,7 +3,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { User, Lock, Eye, EyeOff } from "lucide-react";
+import { User, Lock, Eye, EyeOff, AlertCircle } from "lucide-react";
+import { userService } from "@/services/users";
+import { setCookie } from "nookies";
 
 export default function FormLogin() {
   const router = useRouter();
@@ -74,44 +76,87 @@ export default function FormLogin() {
 
     setIsLoading(true);
 
-    // Mock de usuários para simulação
-    const mockUsers: Record<
-      string,
-      { type: "MEI" | "Investidor"; password: string }
-    > = {
-      "000.000.000-00": { type: "MEI", password: "123456" },
-      "888.888.888-88": { type: "Investidor", password: "123456" },
-    };
-
     try {
-      // Simula verificação de login
-      setTimeout(() => {
-        // Remove formatação do CPF antes de verificar
-        const unformattedCPF = formData.cpf.replace(/\D/g, "");
-        const formattedCPF = formatCPF(unformattedCPF);
-        const user = mockUsers[formattedCPF];
+      console.log("🔄 Tentando fazer login...");
 
-        if (!user || user.password !== formData.senha) {
-          setErrors({ submit: "CPF ou senha incorretos" });
-          setIsLoading(false);
-          return;
-        }
+      const response = await userService.login({
+        cpf: formData.cpf,
+        senha: formData.senha,
+      });
 
-        // Salva o tipo de perfil no localStorage
-        localStorage.setItem("userProfile", user.type);
+      console.log("📦 Resposta completa do backend:", response);
+      console.log("📦 Tipo da resposta:", typeof response);
+      console.log("📦 Chaves da resposta:", Object.keys(response));
 
-        // Redireciona baseado no tipo de usuário
-        if (user.type === "MEI") {
-          router.push("/dashboard");
+      // Verifica se a resposta tem a estrutura esperada
+      const userData = response.usuario || response;
+      const token = response.token || "";
+
+      console.log("✅ Dados do usuário:", userData);
+
+      // Salva o token no cookie
+      if (token) {
+        setCookie(null, "finexus.token", token, {
+          maxAge: 60 * 60 * 24 * 7, // 7 dias
+          path: "/",
+        });
+      }
+
+      // Salva dados do usuário no localStorage
+      localStorage.setItem("userId", String(userData.id));
+      localStorage.setItem("userProfile", userData.tipo);
+      localStorage.setItem("userName", userData.nome);
+      localStorage.setItem("userEmail", userData.email);
+
+      // Redireciona baseado no tipo de usuário
+      if (userData.tipo === "TOMADOR") {
+        router.push("/dashboard");
+      } else {
+        router.push("/carteira");
+      }
+    } catch (error: any) {
+      console.error("❌ Erro no login:", {
+        status: error?.response?.status,
+        statusText: error?.response?.statusText,
+        data: error?.response?.data,
+        message: error?.message,
+      });
+
+      let mensagem = "Erro ao fazer login. Tente novamente.";
+
+      if (error?.response) {
+        // Erro com resposta do servidor
+        const status = error.response.status;
+        const backendMessage = error.response.data?.message;
+
+        if (status === 401 || status === 404) {
+          mensagem = backendMessage || "CPF ou senha incorretos.";
+        } else if (status === 400) {
+          mensagem =
+            backendMessage || "Dados inválidos. Verifique o CPF e senha.";
+        } else if (status === 500) {
+          mensagem = "Erro no servidor. Tente novamente em alguns instantes.";
         } else {
-          router.push("/carteira");
+          mensagem =
+            backendMessage || `Erro ${status}: ${error.response.statusText}`;
         }
+      } else if (error?.request) {
+        // Requisição feita mas sem resposta - pode ser CORS
+        if (error?.message?.includes("Network Error")) {
+          mensagem =
+            "❌ Erro de CORS: O backend está bloqueando requisições. Configure CORS no backend para permitir: " +
+            window.location.origin;
+        } else {
+          mensagem =
+            "Sem resposta do servidor. Verifique sua conexão com a internet.";
+        }
+      } else {
+        // Erro ao configurar a requisição
+        mensagem = error?.message || "Erro desconhecido ao tentar fazer login.";
+      }
 
-        // garante que o estado de loading seja desligado após todo o fluxo
-        setIsLoading(false);
-      }, 1000);
-    } catch {
-      setErrors({ submit: "Erro ao conectar com o servidor" });
+      setErrors({ submit: mensagem });
+    } finally {
       setIsLoading(false);
     }
   };
@@ -201,8 +246,14 @@ export default function FormLogin() {
 
         {/* Erro geral de submit */}
         {errors.submit && (
-          <div className="p-2.5 sm:p-3 bg-red-50 border border-red-200 rounded-lg">
-            <p className="text-xs sm:text-sm text-red-600">{errors.submit}</p>
+          <div className="p-3 sm:p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
+            <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="text-xs sm:text-sm font-semibold text-red-700 mb-1">
+                Erro no login
+              </p>
+              <p className="text-xs sm:text-sm text-red-600">{errors.submit}</p>
+            </div>
           </div>
         )}
 

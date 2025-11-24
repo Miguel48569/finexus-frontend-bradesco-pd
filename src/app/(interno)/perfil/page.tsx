@@ -1,22 +1,32 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import MEI from "./components/Perfil.MEI";
+import TOMADOR from "./components/Perfil.MEI";
 import Investidor from "./components/Perfil.Investidor";
 
 export default function PerfilPage() {
-  const [userType, setUserType] = useState<"MEI" | "Investidor">("MEI");
+  const [userType, setUserType] = useState<"TOMADOR" | "INVESTIDOR" | null>(
+    null
+  );
 
   useEffect(() => {
     const saved = localStorage.getItem("userProfile");
-    console.log("UserProfile from localStorage:", saved); // Debug log
-    if (saved === "MEI" || saved === "Investidor") {
+    console.log("UserProfile from localStorage:", saved);
+    if (saved === "TOMADOR" || saved === "INVESTIDOR") {
       setUserType(saved);
     }
   }, []);
 
-  // Se não houver userType, mostra mensagem de carregamento em vez de null
-  if (!userType) return <div>Carregando...</div>;
+  if (!userType) {
+    return (
+      <div className="p-8 max-w-4xl mx-auto">
+        <div className="bg-white rounded-xl shadow-md p-8 text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-violet-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Carregando perfil...</p>
+        </div>
+      </div>
+    );
+  }
 
-  return userType === "MEI" ? <MEI /> : <Investidor />;
+  return userType === "TOMADOR" ? <TOMADOR /> : <Investidor />;
 }

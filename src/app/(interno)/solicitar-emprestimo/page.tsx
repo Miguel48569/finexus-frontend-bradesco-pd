@@ -10,6 +10,7 @@ import Etapa1 from "./components/Etapa1";
 import Etapa2 from "./components/Etapa2";
 import Etapa3 from "./components/Etapa3";
 import Etapa4Sucesso from "./components/Etapa4Sucesso";
+import { propostaService } from "@/services/proposta";
 // importações de constantes removidas pois são usadas apenas nos componentes
 
 // ============================================
@@ -77,6 +78,16 @@ const calcularSimulacao = (valor: number, prazo: number) => {
     totalJuros: montante - valor,
     taxaMensal: 1.5,
   };
+};
+
+const mapearTempoAtuacaoParaMeses = (tempoAtuacao: string): number => {
+  const mapeamento: { [key: string]: number } = {
+    "menos-1": 6, // Menos de 1 ano = 6 meses
+    "1-2": 18, // 1 a 2 anos = 18 meses (média)
+    "2-5": 42, // 2 a 5 anos = 42 meses (média)
+    "mais-5": 72, // Mais de 5 anos = 72 meses (6 anos)
+  };
+  return mapeamento[tempoAtuacao] || 0;
 };
 
 // ============================================
@@ -276,27 +287,63 @@ export default function SolicitarEmprestimoPage() {
     setLoading(true);
 
     try {
-      // SIMULAÇÃO DE ENVIO
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      const userId = localStorage.getItem("userId");
+      if (!userId) {
+        setErrors({ geral: "Usuário não encontrado. Faça login novamente." });
+        setLoading(false);
+        return;
+      }
 
-      // TODO: Enviar para backend
-      // const formDataToSend = new FormData();
-      // formDataToSend.append("nomeNegocio", formData.nomeNegocio);
-      // ... adicionar todos os campos
-      // formData.documentos.forEach(doc => formDataToSend.append("documentos", doc));
+      // Converte valores formatados para números
+      const valorSolicitadoNumerico = parseFloat(
+        formData.valorSolicitado.replace(/\./g, "").replace(",", ".")
+      );
+      const faturamentoMensalNumerico = parseFloat(
+        formData.faturamentoMensal.replace(/\./g, "").replace(",", ".")
+      );
+      const tempoAtuacaoMeses = mapearTempoAtuacaoParaMeses(
+        formData.tempoAtuacao
+      );
+      const prazoMeses = parseInt(formData.prazo);
 
-      // const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/emprestimos`, {
-      //   method: "POST",
-      //   body: formDataToSend,
-      // });
+      // Prepara dados para enviar ao backend
+      const dadosProposta = {
+        nomeNegocio: formData.nomeNegocio,
+        categoria: formData.categoria,
+        descricaoNegocio: formData.descricaoNegocio,
+        cnpj: formData.cnpj,
+        tempoAtuacaoMeses: tempoAtuacaoMeses,
+        faturamentoMensal: faturamentoMensalNumerico,
+        valorSolicitado: valorSolicitadoNumerico,
+        saldoInvestido: 0, // Valor inicial
+        prazoMeses: prazoMeses,
+        motivoEmprestimo: formData.finalidade,
+        descricaoUsoRecurso: formData.descricaoFinalidade,
+        solicitante: {
+          id: parseInt(userId),
+        },
+      };
 
-      console.log("Dados enviados:", formData);
+      console.log("📤 Enviando proposta para o backend:", dadosProposta);
+
+      const response = await propostaService.criar(dadosProposta);
+
+      console.log("✅ Proposta criada com sucesso:", response);
 
       // Vai para página de sucesso
       setEtapaAtual(4);
-    } catch (erro: unknown) {
-      const mensagem =
-        erro instanceof Error ? erro.message : "Erro ao enviar solicitação";
+    } catch (erro: any) {
+      console.error("❌ Erro ao criar proposta:", erro);
+      let mensagem = "Erro ao enviar solicitação";
+
+      if (erro?.response?.data?.message) {
+        mensagem = erro.response.data.message;
+      } else if (erro?.response?.status === 400) {
+        mensagem = "Dados inválidos. Verifique as informações.";
+      } else if (erro?.response?.status === 500) {
+        mensagem = "Erro no servidor. Tente novamente mais tarde.";
+      }
+
       setErrors({ geral: mensagem });
     } finally {
       setLoading(false);

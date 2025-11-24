@@ -4,6 +4,8 @@
 "use client";
 
 import { useState, useEffect, ChangeEvent } from "react";
+
+import { propostaService, PropostaRequest, PropostaResponse } from "@/services/proposta";
 import { useParams, useRouter } from "next/navigation";
 import {
   ArrowLeft,
@@ -55,70 +57,7 @@ interface InvestmentDetails {
 // ============================================
 // 2. DADOS MOCK (depois buscar do backend)
 // ============================================
-const MOCK_DETAILS: Record<string, InvestmentDetails> = {
-  "1": {
-    id: "1",
-    meiName: "Maria Silva",
-    businessName: "Cafeteria Aroma Bom",
-    description: "Expansão da cafeteria com novos equipamentos e área externa",
-    fullDescription:
-      "A Cafeteria Aroma Bom está em operação há 5 anos no bairro Centro e conquistou uma base sólida de clientes fiéis. Com o crescimento da demanda, buscamos investimento para expandir nossa área de atendimento com uma nova varanda climatizada e adquirir equipamentos profissionais de última geração. O investimento permitirá aumentar nossa capacidade de atendimento em 60% e diversificar nosso cardápio com produtos premium.",
-    totalValue: 50000,
-    currentValue: 32500,
-    progress: 65,
-    interestRate: 1.8,
-    duration: 36,
-    minInvestment: 1000,
-    risk: "Baixo",
-    type: "Empréstimo",
-    category: "Alimentação",
-    investors: 12,
-    daysLeft: 15,
-    documents: [
-      { name: "Plano de Negócios", type: "PDF" },
-      { name: "Demonstrativo Financeiro 2024", type: "PDF" },
-      { name: "Certidão Negativa de Débitos", type: "PDF" },
-      { name: "Contrato Social", type: "PDF" },
-    ],
-    businessInfo: {
-      cnpj: "12.345.678/0001-90",
-      foundedYear: 2019,
-      employees: 8,
-      monthlyRevenue: 45000,
-    },
-  },
-  "2": {
-    id: "2",
-    meiName: "João Santos",
-    businessName: "Loja Fashion Style",
-    description: "Ampliação do estoque para a temporada de verão",
-    fullDescription:
-      "A Fashion Style é uma loja de moda feminina com forte presença no shopping local. Buscamos capital para ampliar nosso estoque visando a temporada de verão, nosso período de maior movimento. O investimento será aplicado na compra de coleções de fornecedores renomados, aumentando nossa margem de lucro em 40%.",
-    totalValue: 120000,
-    currentValue: 50400,
-    progress: 42,
-    interestRate: 1.2,
-    duration: 84,
-    minInvestment: 5000,
-    risk: "Baixo",
-    type: "Financiamento",
-    category: "Varejo",
-    investors: 8,
-    daysLeft: 22,
-    documents: [
-      { name: "Plano de Negócios", type: "PDF" },
-      { name: "Balanço Patrimonial", type: "PDF" },
-      { name: "Contrato de Locação", type: "PDF" },
-    ],
-    businessInfo: {
-      cnpj: "98.765.432/0001-10",
-      foundedYear: 2018,
-      employees: 12,
-      monthlyRevenue: 85000,
-    },
-  },
-  // Adicione os outros conforme necessário...
-};
+
 
 // ============================================
 // 3. FUNÇÕES AUXILIARES
@@ -166,36 +105,51 @@ export default function DetalhesInvestimentoPage() {
   // 5. BUSCAR DADOS (useEffect)
   // ============================================
   useEffect(() => {
-    buscarDetalhes();
-  }, [id]);
-
-  const buscarDetalhes = async () => {
+  const carregarDetalhes = async () => {
     try {
-      // SIMULAÇÃO DE DELAY (para parecer requisição real)
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      const dados = await propostaService.buscarPorId(Number(id));
 
-      // MOCK: Busca dados locais
-      const dados = MOCK_DETAILS[id];
+      const investimentoConvertido: InvestmentDetails = {
+        id: String(dados.id),
+        meiName: "MEI", // você pode mudar depois se quiser
+        businessName: dados.nomeNegocio,
+        description: dados.descricaoNegocio,
+        fullDescription: dados.descricaoUsoRecurso || dados.descricaoNegocio,
+        totalValue: dados.valorSolicitado,
+        currentValue: dados.saldoInvestido,
+        progress: Math.floor((dados.saldoInvestido / dados.valorSolicitado) * 100),
+        interestRate: dados.taxaJuros,
+        duration: dados.prazoMeses,
+        minInvestment: 100,
+        risk: "Médio",
+        category: dados.categoria,
+        type: "Empréstimo",
 
-      if (!dados) {
-        // Se não encontrar, volta para marketplace
-        router.push("/marketplace");
-        return;
-      }
+        // ❗ Esses dados *não existem* no back, então setei valores padrão:
+        investors: 0,
+        daysLeft: 30,
 
-      setInvestimento(dados);
+        documents: [],
 
-      // TODO: Depois trocar por requisição real:
-      // const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/investimentos/${id}`);
-      // const dados = await response.json();
-      // setInvestimento(dados);
-    } catch (erro) {
-      console.error("Erro ao buscar detalhes:", erro);
-      router.push("/marketplace");
+        businessInfo: {
+          cnpj: dados.cnpj,
+          foundedYear: 2020,
+          employees: 1,
+          monthlyRevenue: dados.faturamentoMensal,
+        },
+      };
+
+      setInvestimento(investimentoConvertido);
+    } catch (err) {
+      console.error("Erro ao carregar detalhes:", err);
     } finally {
       setLoading(false);
     }
   };
+
+  carregarDetalhes();
+}, [id]);
+
 
   // ============================================
   // 6. SIMULADOR DE RENDIMENTO
