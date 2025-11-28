@@ -21,13 +21,11 @@ interface EmprestimoAtivo {
   parcelas: ParcelaResponse[];
 }
 
-const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=BOLETO-$`;
-
 export default function PagamentosPage() {
   const [modalOpen, setModalOpen] = useState(false);
-  const [selectedParcela, setSelectedParcela] = useState<ParcelaResponse | null>(null);
+  const [selectedParcela, setSelectedParcela] =
+    useState<ParcelaResponse | null>(null);
   const [pixCopiado, setPixCopiado] = useState(false);
-  const [boletoUrl, setBoletoUrl] = useState<string | null>(null);
   const [emprestimo, setEmprestimo] = useState<EmprestimoAtivo>({
     id: 1, // aqui você pode colocar o ID real do empréstimo
     valorTotal: 0,
@@ -72,7 +70,7 @@ export default function PagamentosPage() {
         ...prev,
         parcelas: prev.parcelas.map((p) =>
           p.id === selectedParcela.id ? { ...p, status: "PAGA" } : p
-        )
+        ),
       }));
 
       console.log("Pagamento confirmado!");
@@ -87,7 +85,6 @@ export default function PagamentosPage() {
     try {
       const blob = await parcelaService.gerarBoleto(selectedParcela.id);
       const url = URL.createObjectURL(blob);
-      setBoletoUrl(url);
       window.open(url, "_blank");
 
       await pagarParcela(); // 👈 AQUI! Confirmar pagamento.
@@ -150,7 +147,7 @@ export default function PagamentosPage() {
 
       <div className="max-w-4xl mx-auto p-4 space-y-6">
         {/* 1. CARD DE RESUMO (DESTAQUE) */}
-        <div className="bg-indigo-900 rounded-2xl p-6 text-white shadow-lg relative overflow-hidden">
+        <div className="bg-gradient-to-br from-violet-600 to-violet-500 rounded-2xl p-6 text-white shadow-lg relative overflow-hidden">
           {/* Bolhas decorativas de fundo */}
           <div className="absolute top-0 right-0 -mr-10 -mt-10 w-40 h-40 bg-white opacity-10 rounded-full blur-2xl"></div>
           <div className="absolute bottom-0 left-0 -ml-10 -mb-10 w-40 h-40 bg-purple-500 opacity-20 rounded-full blur-3xl"></div>
@@ -177,20 +174,22 @@ export default function PagamentosPage() {
             </div>
 
             {/* Barra de Progresso do Empréstimo */}
-            <div className="w-full md:w-1/3 bg-indigo-800/50 p-4 rounded-xl backdrop-blur-sm border border-indigo-700/50">
+            <div className="w-full md:w-1/3 bg-violet-500 shadow-lg p-4 rounded-xl backdrop-blur-sm border border-violet-600/50">
               <div className="flex justify-between text-sm mb-2">
-                <span className="text-indigo-200">Empréstimo Quitado</span>
+                <span className="text-white font-medium">
+                  Empréstimo Quitado
+                </span>
                 <span className="font-bold">
                   {Number(emprestimo.progresso).toFixed(2)}%
                 </span>
               </div>
-              <div className="w-full bg-indigo-950 rounded-full h-2.5">
+              <div className="w-full bg-violet-900 rounded-full h-2.5">
                 <div
                   className="bg-gradient-to-r from-green-400 to-emerald-500 h-2.5 rounded-full transition-all duration-1000"
                   style={{ width: `${emprestimo.progresso}%` }}
                 ></div>
               </div>
-              <p className="text-xs text-indigo-300 mt-2 text-right">
+              <p className="text-xs text-white  font-medium mt-2 text-right">
                 R$ {Number(emprestimo.valorPago).toFixed(2)} de R${" "}
                 {Number(emprestimo.valorTotal).toFixed(2)}
               </p>
@@ -201,7 +200,7 @@ export default function PagamentosPage() {
         {/* 2. LISTA DE PARCELAS */}
         <div>
           <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-            <PieChart size={20} className="text-indigo-600" />
+            <PieChart size={20} className="text-violet-800" />
             Histórico de Parcelas
           </h3>
 
@@ -209,21 +208,23 @@ export default function PagamentosPage() {
             {emprestimo.parcelas.map((parcela) => (
               <div
                 key={parcela.id}
-                className={`flex items-center justify-between p-4 border-b last:border-0 hover:bg-gray-50 transition-colors ${parcela.status === "VENCIDA"
-                  ? "bg-red-50 hover:bg-red-100/50"
-                  : ""
-                  }`}
+                className={`flex items-center justify-between p-4 border-b last:border-0 hover:bg-gray-50 transition-colors ${
+                  parcela.status === "VENCIDA"
+                    ? "bg-red-50 hover:bg-red-100/50"
+                    : ""
+                }`}
               >
                 {/* Lado Esquerdo: Info */}
                 <div className="flex items-center gap-4">
                   <div
                     className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 
-                    ${parcela.status === "PAGA"
+                    ${
+                      parcela.status === "PAGA"
                         ? "bg-green-100 text-green-600"
                         : parcela.status === "VENCIDA"
-                          ? "bg-red-100 text-red-600"
-                          : "bg-indigo-50 text-indigo-600"
-                      }`}
+                        ? "bg-red-100 text-red-600"
+                        : "bg-indigo-50 text-indigo-600"
+                    }`}
                   >
                     {parcela.status === "PAGA" ? (
                       <CheckCircle2 size={20} />
@@ -238,10 +239,11 @@ export default function PagamentosPage() {
                       Parcela #{parcela.id}
                     </p>
                     <p
-                      className={`text-sm ${parcela.status === "VENCIDA"
-                        ? "text-red-600 font-medium"
-                        : "text-gray-500"
-                        }`}
+                      className={`text-sm ${
+                        parcela.status === "VENCIDA"
+                          ? "text-red-600 font-medium"
+                          : "text-gray-500"
+                      }`}
                     >
                       Vence em {parcela.vencimento}
                     </p>
@@ -262,9 +264,10 @@ export default function PagamentosPage() {
                     <button
                       onClick={() => handlePagar(parcela)}
                       className={`flex items-center gap-1 px-4 py-2 rounded-lg text-sm font-medium transition-colors
-                        ${parcela.status === "VENCIDA"
-                          ? "bg-red-600 hover:bg-red-700 text-white shadow-red-200 shadow-md"
-                          : "bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-200 shadow-md"
+                        ${
+                          parcela.status === "VENCIDA"
+                            ? "bg-red-600 hover:bg-red-700 text-white shadow-red-200 shadow-md"
+                            : "bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-200 shadow-md"
                         }`}
                     >
                       Pagar
@@ -325,10 +328,11 @@ export default function PagamentosPage() {
             <button
               onClick={copiarPix}
               className={`w-full mt-3 py-3.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-all
-    ${pixCopiado
-                  ? "bg-green-500 text-white"
-                  : "bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-200"
-                }`}
+    ${
+      pixCopiado
+        ? "bg-green-500 text-white"
+        : "bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-200"
+    }`}
             >
               {pixCopiado ? (
                 <>
