@@ -6,6 +6,7 @@
 import { useState, useEffect, ChangeEvent } from "react";
 
 import { propostaService, PropostaRequest, PropostaResponse } from "@/services/proposta";
+import { investimentoService } from "@/services/investimento";
 import { useParams, useRouter } from "next/navigation";
 import {
   ArrowLeft,
@@ -96,6 +97,59 @@ export default function DetalhesInvestimentoPage() {
     null
   );
   const [loading, setLoading] = useState(true);
+  const [userId, setUserId] = useState<number | null>(null);
+
+  const realizarInvestimento = async () => {
+    if (!userId) {
+      alert("Usuário não identificado.");
+      return;
+    }
+
+    if (!investimento) {
+      alert("Proposta não encontrada.");
+      return;
+    }
+
+    const valor = parseBRL(valorSimulacao);
+
+    if (valor < investimento.minInvestment) {
+      setErroMinimo(
+        `O valor mínimo para investir é R$ ${investimento.minInvestment.toLocaleString("pt-BR")}`
+      );
+      return;
+    }
+
+    try {
+      const payload = {
+        idInvestidor: userId,
+        idProposta: Number(investimento.id),
+        valor: valor
+      };
+
+      console.log("📤 Enviando investimento:", payload);
+
+      await investimentoService.criar(payload);
+
+      alert("Investimento realizado com sucesso!");
+
+      setShowModalInvestir(false);
+      router.push("/marketplace");
+
+    } catch (err: any) {
+      console.error("Erro ao investir:", err);
+      alert("Erro ao realizar investimento.");
+    }
+  };
+
+
+  useEffect(() => {
+    const idLocal = localStorage.getItem("userId");
+    console.log("🟣 userId carregado na page:", idLocal);
+
+    if (idLocal) {
+      setUserId(Number(idLocal));
+    }
+  }, []);
   const [valorSimulacao, setValorSimulacao] = useState("");
   const [erroMinimo, setErroMinimo] = useState("");
   const [tentouConfirmar, setTentouConfirmar] = useState(false);
@@ -105,50 +159,50 @@ export default function DetalhesInvestimentoPage() {
   // 5. BUSCAR DADOS (useEffect)
   // ============================================
   useEffect(() => {
-  const carregarDetalhes = async () => {
-    try {
-      const dados = await propostaService.buscarPorId(Number(id));
+    const carregarDetalhes = async () => {
+      try {
+        const dados = await propostaService.buscarPorId(Number(id));
 
-      const investimentoConvertido: InvestmentDetails = {
-        id: String(dados.id),
-        meiName: "MEI", // você pode mudar depois se quiser
-        businessName: dados.nomeNegocio,
-        description: dados.descricaoNegocio,
-        fullDescription: dados.descricaoUsoRecurso || dados.descricaoNegocio,
-        totalValue: dados.valorSolicitado,
-        currentValue: dados.saldoInvestido,
-        progress: Math.floor((dados.saldoInvestido / dados.valorSolicitado) * 100),
-        interestRate: dados.taxaJuros,
-        duration: dados.prazoMeses,
-        minInvestment: 100,
-        risk: "Médio",
-        category: dados.categoria,
-        type: "Empréstimo",
+        const investimentoConvertido: InvestmentDetails = {
+          id: String(dados.id),
+          meiName: "MEI", // você pode mudar depois se quiser
+          businessName: dados.nomeNegocio,
+          description: dados.descricaoNegocio,
+          fullDescription: dados.descricaoUsoRecurso || dados.descricaoNegocio,
+          totalValue: dados.valorSolicitado,
+          currentValue: dados.saldoInvestido,
+          progress: Math.floor((dados.saldoInvestido / dados.valorSolicitado) * 100),
+          interestRate: dados.taxaJuros,
+          duration: dados.prazoMeses,
+          minInvestment: 100,
+          risk: "Médio",
+          category: dados.categoria,
+          type: "Empréstimo",
 
-        // ❗ Esses dados *não existem* no back, então setei valores padrão:
-        investors: 0,
-        daysLeft: 30,
+          // ❗ Esses dados *não existem* no back, então setei valores padrão:
+          investors: 0,
+          daysLeft: 30,
 
-        documents: [],
+          documents: [],
 
-        businessInfo: {
-          cnpj: dados.cnpj,
-          foundedYear: 2020,
-          employees: 1,
-          monthlyRevenue: dados.faturamentoMensal,
-        },
-      };
+          businessInfo: {
+            cnpj: dados.cnpj,
+            foundedYear: 2020,
+            employees: 1,
+            monthlyRevenue: dados.faturamentoMensal,
+          },
+        };
 
-      setInvestimento(investimentoConvertido);
-    } catch (err) {
-      console.error("Erro ao carregar detalhes:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
+        setInvestimento(investimentoConvertido);
+      } catch (err) {
+        console.error("Erro ao carregar detalhes:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  carregarDetalhes();
-}, [id]);
+    carregarDetalhes();
+  }, [id]);
 
 
   // ============================================
@@ -376,10 +430,9 @@ export default function DetalhesInvestimentoPage() {
                 />
                 <InfoItem
                   label="Tempo de Mercado"
-                  value={`${
-                    new Date().getFullYear() -
+                  value={`${new Date().getFullYear() -
                     investimento.businessInfo.foundedYear
-                  } anos`}
+                    } anos`}
                 />
                 <InfoItem label="Categoria" value={investimento.category} />
               </div>
@@ -586,30 +639,12 @@ export default function DetalhesInvestimentoPage() {
                   Cancelar
                 </button>
                 <button
-                  onClick={() => {
-                    if (
-                      !valorSimulacao ||
-                      parseBRL(valorSimulacao) < investimento.minInvestment
-                    ) {
-                      setTentouConfirmar(true);
-                      setErroMinimo(
-                        `Informe um valor para investir igual ou maior que R$ ${investimento.minInvestment.toLocaleString(
-                          "pt-BR"
-                        )}`
-                      );
-                      return;
-                    }
-                    setShowModalInvestir(false);
-                    setErroMinimo("");
-                    setTentouConfirmar(false);
-                    router.push("/marketplace");
-                  }}
-                  className={`flex-1 bg-violet-600 hover:bg-violet-700 text-white py-3 rounded-lg font-semibold shadow-lg transition ${
-                    !valorSimulacao ||
+                  onClick={realizarInvestimento}
+                  className={`flex-1 bg-violet-600 hover:bg-violet-700 text-white py-3 rounded-lg font-semibold shadow-lg transition ${!valorSimulacao ||
                     parseBRL(valorSimulacao) < investimento.minInvestment
-                      ? "opacity-50"
-                      : ""
-                  }`}
+                    ? "opacity-50"
+                    : ""
+                    }`}
                 >
                   Confirmar
                 </button>
@@ -675,9 +710,8 @@ function MetricCard({ icon: Icon, label, value, color }: MetricCardProps) {
 
   return (
     <div
-      className={`rounded-xl p-4 border-2 ${
-        colorClasses[color] || colorClasses.violet
-      }`}
+      className={`rounded-xl p-4 border-2 ${colorClasses[color] || colorClasses.violet
+        }`}
     >
       <Icon className="w-5 h-5 mb-2" />
       <p className="text-xs font-semibold mb-1 opacity-80">{label}</p>
@@ -711,23 +745,20 @@ interface SimulacaoItemProps {
 function SimulacaoItem({ label, value, highlight }: SimulacaoItemProps) {
   return (
     <div
-      className={`flex items-center justify-between py-2 ${
-        highlight ? "border-t-2 border-gray-200 pt-3" : ""
-      }`}
+      className={`flex items-center justify-between py-2 ${highlight ? "border-t-2 border-gray-200 pt-3" : ""
+        }`}
     >
       <span
-        className={`text-sm ${
-          highlight ? "font-bold text-gray-900" : "text-gray-600"
-        }`}
+        className={`text-sm ${highlight ? "font-bold text-gray-900" : "text-gray-600"
+          }`}
       >
         {label}
       </span>
       <span
-        className={`${
-          highlight
-            ? "text-lg font-bold text-green-600"
-            : "font-semibold text-gray-900"
-        }`}
+        className={`${highlight
+          ? "text-lg font-bold text-green-600"
+          : "font-semibold text-gray-900"
+          }`}
       >
         {value}
       </span>

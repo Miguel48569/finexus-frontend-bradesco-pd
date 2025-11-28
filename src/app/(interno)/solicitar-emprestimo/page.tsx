@@ -396,11 +396,10 @@ export default function SolicitarEmprestimoPage() {
               <div key={etapa.num} className="flex items-center flex-1">
                 <div className="flex flex-col items-center flex-1">
                   <div
-                    className={`w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center font-bold transition-all ${
-                      etapaAtual >= etapa.num
-                        ? "bg-violet-600 text-white"
-                        : "bg-gray-200 text-gray-500"
-                    }`}
+                    className={`w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center font-bold transition-all ${etapaAtual >= etapa.num
+                      ? "bg-violet-600 text-white"
+                      : "bg-gray-200 text-gray-500"
+                      }`}
                   >
                     {etapaAtual > etapa.num ? (
                       <CheckCircle className="w-6 h-6" />
@@ -409,20 +408,18 @@ export default function SolicitarEmprestimoPage() {
                     )}
                   </div>
                   <span
-                    className={`text-xs md:text-sm mt-2 font-medium ${
-                      etapaAtual >= etapa.num
-                        ? "text-violet-600"
-                        : "text-gray-500"
-                    }`}
+                    className={`text-xs md:text-sm mt-2 font-medium ${etapaAtual >= etapa.num
+                      ? "text-violet-600"
+                      : "text-gray-500"
+                      }`}
                   >
                     {etapa.label}
                   </span>
                 </div>
                 {index < 3 && (
                   <div
-                    className={`h-1 flex-1 mx-2 rounded transition-all ${
-                      etapaAtual > etapa.num ? "bg-violet-600" : "bg-gray-200"
-                    }`}
+                    className={`h-1 flex-1 mx-2 rounded transition-all ${etapaAtual > etapa.num ? "bg-violet-600" : "bg-gray-200"
+                      }`}
                   />
                 )}
               </div>
@@ -494,9 +491,9 @@ export default function SolicitarEmprestimoPage() {
                   </button>
                 ) : (
                   <button
-                    type="button"
-                    onClick={handleSubmit}
+                    type="submit"
                     disabled={loading}
+
                     className="flex-1 bg-gradient-to-r from-violet-500 to-purple-500 hover:from-violet-600 hover:to-purple-600 text-white py-3 px-6 rounded-xl font-semibold flex items-center justify-center gap-2 transition disabled:opacity-50"
                   >
                     {loading ? (

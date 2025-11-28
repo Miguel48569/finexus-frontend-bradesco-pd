@@ -15,6 +15,16 @@ import {
   Tooltip,
 } from "recharts";
 import { propostaService, PropostaResponse } from "@/services/proposta";
+import { saldoService, SaldoResponse } from "@/services/saldo";
+
+type StatusProposta =
+  | "ABERTA"
+  | "EM_ANALISE"
+  | "APROVADA"
+  | "FINANCIADA"
+  | "EM_PAGAMENTO"
+  | "FINALIZADA"
+  | "REJEITADA";
 
 interface Emprestimo {
   id: number;
@@ -22,7 +32,7 @@ interface Emprestimo {
   valor: number;
   pago: number;
   juros: number;
-  status: "Ativo" | "Quitado" | "Atrasado";
+  status: StatusProposta;
   dataVencimento: string;
   dataSolicitacao: string;
 }
@@ -36,6 +46,18 @@ export default function DashboardMEI() {
 
   // Busca propostas do backend
   useEffect(() => {
+    const fetchSaldo = async () => {
+      try {
+        const userId = localStorage.getItem("userId");
+        if (!userId) return;
+
+        const response = await saldoService.buscarPorUsuario(Number(userId));
+        setSaldo(response.valor);
+      } catch (err) {
+        console.error("Erro ao buscar saldo:", err);
+      }
+    };
+
     const fetchPropostas = async () => {
       try {
         const userId = localStorage.getItem("userId");
@@ -57,8 +79,8 @@ export default function DashboardMEI() {
           empresa: p.nomeNegocio,
           valor: p.valorSolicitado,
           pago: p.saldoInvestido,
-          juros: 3.5, // Taxa padrão (pode vir do backend depois)
-          status: mapearStatus(p.status),
+          juros: 3.5,
+          status: (p.status ?? "ABERTA") as StatusProposta, // ⭐ FIX AQUI
           dataVencimento: calcularDataVencimento(p.prazoMeses),
           dataSolicitacao: formatarData(p.dataCriacao),
         }));
@@ -72,8 +94,23 @@ export default function DashboardMEI() {
       }
     };
 
+    // Chama as duas funções
+    fetchSaldo();
     fetchPropostas();
   }, []);
+
+  // Badges estilos
+  const badgeStyle = (status: StatusProposta) => {
+    return {
+      ABERTA: "bg-blue-100 text-blue-600",
+      EM_ANALISE: "bg-yellow-100 text-yellow-700",
+      APROVADA: "bg-green-100 text-green-700",
+      FINANCIADA: "bg-purple-100 text-purple-700",
+      EM_PAGAMENTO: "bg-violet-100 text-violet-700",
+      FINALIZADA: "bg-gray-200 text-gray-700",
+      REJEITADA: "bg-red-100 text-red-700",
+    }[status];
+  };
 
   // Função auxiliar para mapear status do backend
   const mapearStatus = (status?: string): "Ativo" | "Quitado" | "Atrasado" => {
@@ -102,21 +139,21 @@ export default function DashboardMEI() {
 
   // Cálculos do dashboard
   const saldoDisponivel = emprestimos.reduce(
-    (acc, e) => acc + (e.status === "Quitado" ? e.valor : 0),
+    (acc, e) => acc + (e.status === "ABERTA" ? e.valor : 0),
     0
   );
   const saldoBloqueado = emprestimos.reduce(
-    (acc, e) => acc + (e.status === "Ativo" ? e.valor - e.pago : 0),
+    (acc, e) => acc + (e.status === "ABERTA" ? e.valor - e.pago : 0),
     0
   );
   const totalRecebido = emprestimos.reduce((acc, e) => acc + e.pago, 0);
-  const portfolioTotal = saldoDisponivel + saldoBloqueado;
+  const [saldo, setSaldo] = useState<number>(0);
   const variacao = 37.8;
   const variacaoValor = 21589.99;
-  const emprestimosAtivos = emprestimos.filter((e) => e.status === "Ativo");
+  const emprestimosAtivos = emprestimos.filter((e) => e.status === "ABERTA");
 
   const dadosPizza = emprestimos
-    .filter((e) => e.status === "Ativo")
+    .filter((e) => e.status === "ABERTA")
     .map((e) => ({
       name: e.empresa,
       value: e.valor,
@@ -163,10 +200,7 @@ export default function DashboardMEI() {
             <div className="flex-1">
               <p className="text-violet-200 mb-2 text-sm">Portfolio Total</p>
               <h1 className="text-5xl font-bold mb-2">
-                R${" "}
-                {portfolioTotal.toLocaleString("pt-BR", {
-                  minimumFractionDigits: 2,
-                })}
+                R$ {saldo.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
               </h1>
               <p className="text-violet-100 text-sm">
                 Saldo disponível para movimentação
@@ -381,15 +415,9 @@ export default function DashboardMEI() {
                       </td>
                       <td className="py-4 px-4">
                         <span
-                          className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                            emp.status === "Ativo"
-                              ? "bg-violet-100 text-violet-700"
-                              : emp.status === "Quitado"
-                              ? "bg-green-100 text-green-700"
-                              : "bg-red-100 text-red-700"
-                          }`}
+                          className={`px-3 py-1 rounded-full text-xs font-semibold ${badgeStyle(emp.status)}`}
                         >
-                          {emp.status}
+                          {emp.status.replace("_", " ")}
                         </span>
                       </td>
                       <td className="py-4 px-4 font-semibold text-gray-800">

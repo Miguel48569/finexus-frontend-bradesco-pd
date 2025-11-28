@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   CreditCard,
   Calendar,
@@ -11,51 +11,131 @@ import {
   DollarSign,
   PieChart,
 } from "lucide-react";
+import { parcelaService, ParcelaResponse } from "@/services/parcela";
 
-// --- MOCK DATA (Simulando o que viria do seu users.ts) ---
-const emprestimoAtivo = {
-  id: "EMP-2024-001",
-  valorTotal: 5000,
-  valorPago: 1500,
-  progresso: 30, // 30% pago
-  parcelas: [
-    { id: 1, valor: 500, vencimento: "20/10/2024", status: "paga" },
-    { id: 2, valor: 500, vencimento: "20/11/2024", status: "paga" },
-    { id: 3, valor: 500, vencimento: "20/12/2024", status: "paga" },
-    { id: 4, valor: 500, vencimento: "20/01/2025", status: "vencida" },
-    { id: 5, valor: 500, vencimento: "20/02/2025", status: "aberta" },
-    { id: 6, valor: 500, vencimento: "20/03/2025", status: "aberta" },
-    { id: 7, valor: 500, vencimento: "20/04/2025", status: "pendente" },
-    { id: 8, valor: 500, vencimento: "20/05/2025", status: "pendente" },
-    { id: 9, valor: 500, vencimento: "20/06/2025", status: "aberta" },
-    { id: 10, valor: 500, vencimento: "20/07/2025", status: "aberta" },
-  ],
-};
+interface EmprestimoAtivo {
+  id: number;
+  valorTotal: number;
+  valorPago: number;
+  progresso: number;
+  parcelas: ParcelaResponse[];
+}
+
+const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=BOLETO-$`;
 
 export default function PagamentosPage() {
   const [modalOpen, setModalOpen] = useState(false);
-  const [selectedParcela, setSelectedParcela] = useState<any>(null);
+  const [selectedParcela, setSelectedParcela] = useState<ParcelaResponse | null>(null);
   const [pixCopiado, setPixCopiado] = useState(false);
+  const [boletoUrl, setBoletoUrl] = useState<string | null>(null);
+  const [emprestimo, setEmprestimo] = useState<EmprestimoAtivo>({
+    id: 1, // aqui você pode colocar o ID real do empréstimo
+    valorTotal: 0,
+    valorPago: 0,
+    progresso: 0,
+    parcelas: [],
+  });
+  const [loading, setLoading] = useState(true);
 
   // Função para abrir o modal de pagamento
-  const handlePagar = (parcela: any) => {
+  const handlePagar = (parcela: ParcelaResponse) => {
     setSelectedParcela(parcela);
     setModalOpen(true);
     setPixCopiado(false);
   };
 
-  // Simula cópia do PIX
-  const copiarPix = () => {
+  // Copiar PIX
+  const copiarPix = async () => {
     navigator.clipboard.writeText(
       "00020126580014BR.GOV.BCB.PIX0136123e4567-e89b-12d3-a456-4266141740005204000053039865802BR5913Finexus P2P6008BRASILIA62070503***6304"
     );
     setPixCopiado(true);
     setTimeout(() => setPixCopiado(false), 3000);
+
+    await pagarParcela(); // 👈 AQUI! Confirmar pagamento
   };
 
-  // Pega a próxima parcela que precisa ser paga (A primeira que não está paga)
-  const proximaParcela = emprestimoAtivo.parcelas.find(
-    (p) => p.status === "vencida" || p.status === "aberta"
+  const pagarParcela = async () => {
+    if (!selectedParcela) return;
+
+    try {
+      const userId = localStorage.getItem("userId");
+      if (!userId) {
+        console.error("Usuário não logado");
+        return;
+      }
+
+      await parcelaService.pagar(selectedParcela.id, Number(userId));
+
+      // Atualiza UI
+      setEmprestimo((prev) => ({
+        ...prev,
+        parcelas: prev.parcelas.map((p) =>
+          p.id === selectedParcela.id ? { ...p, status: "PAGA" } : p
+        )
+      }));
+
+      console.log("Pagamento confirmado!");
+    } catch (err) {
+      console.error("Erro ao pagar parcela:", err);
+    }
+  };
+
+  const abrirBoleto = async () => {
+    if (!selectedParcela) return;
+
+    try {
+      const blob = await parcelaService.gerarBoleto(selectedParcela.id);
+      const url = URL.createObjectURL(blob);
+      setBoletoUrl(url);
+      window.open(url, "_blank");
+
+      await pagarParcela(); // 👈 AQUI! Confirmar pagamento.
+    } catch (err) {
+      console.error("Erro ao gerar boleto:", err);
+    }
+  };
+  // Pegar próximas parcelas do backend
+  useEffect(() => {
+    const fetchParcelas = async () => {
+      try {
+        const userId = localStorage.getItem("userId");
+        if (!userId) return;
+
+        // Substitua pelo ID da dívida que você quer buscar
+        const idDivida = 1;
+        const parcelas = await parcelaService.listarPorDivida(idDivida);
+
+        const valorPago = parcelas
+          .filter((p) => p.status === "PAGA")
+          .reduce((acc, p) => acc + p.valor, 0);
+
+        const valorTotal = parcelas.reduce((acc, p) => acc + p.valor, 0);
+
+        const progresso = Math.round((valorPago / valorTotal) * 100);
+
+        setEmprestimo({
+          id: idDivida,
+          valorTotal,
+          valorPago,
+          progresso,
+          parcelas,
+        });
+      } catch (err) {
+        console.error("Erro ao carregar parcelas:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchParcelas();
+  }, []);
+
+  if (loading) return <p className="p-6 text-center">Carregando parcelas...</p>;
+
+  // Pega a próxima parcela que precisa ser paga
+  const proximaParcela = emprestimo.parcelas.find(
+    (p) => p.status === "VENCIDA" || p.status === "PENDENTE"
   );
 
   return (
@@ -88,9 +168,9 @@ export default function PagamentosPage() {
                 <span className="text-sm font-medium">
                   {proximaParcela?.vencimento}
                 </span>
-                {proximaParcela?.status === "ATRASADO" && (
+                {proximaParcela?.status === "VENCIDA" && (
                   <span className="ml-2 bg-red-500 text-white text-xs px-2 py-0.5 rounded-full font-bold">
-                    ATRASADO
+                    VENCIDA
                   </span>
                 )}
               </div>
@@ -100,17 +180,19 @@ export default function PagamentosPage() {
             <div className="w-full md:w-1/3 bg-indigo-800/50 p-4 rounded-xl backdrop-blur-sm border border-indigo-700/50">
               <div className="flex justify-between text-sm mb-2">
                 <span className="text-indigo-200">Empréstimo Quitado</span>
-                <span className="font-bold">{emprestimoAtivo.progresso}%</span>
+                <span className="font-bold">
+                  {Number(emprestimo.progresso).toFixed(2)}%
+                </span>
               </div>
               <div className="w-full bg-indigo-950 rounded-full h-2.5">
                 <div
                   className="bg-gradient-to-r from-green-400 to-emerald-500 h-2.5 rounded-full transition-all duration-1000"
-                  style={{ width: `${emprestimoAtivo.progresso}%` }}
+                  style={{ width: `${emprestimo.progresso}%` }}
                 ></div>
               </div>
               <p className="text-xs text-indigo-300 mt-2 text-right">
-                R$ {emprestimoAtivo.valorPago} de R${" "}
-                {emprestimoAtivo.valorTotal}
+                R$ {Number(emprestimo.valorPago).toFixed(2)} de R${" "}
+                {Number(emprestimo.valorTotal).toFixed(2)}
               </p>
             </div>
           </div>
@@ -124,30 +206,28 @@ export default function PagamentosPage() {
           </h3>
 
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-            {emprestimoAtivo.parcelas.map((parcela) => (
+            {emprestimo.parcelas.map((parcela) => (
               <div
                 key={parcela.id}
-                className={`flex items-center justify-between p-4 border-b last:border-0 hover:bg-gray-50 transition-colors ${
-                  parcela.status === "ATRASADO"
-                    ? "bg-red-50 hover:bg-red-100/50"
-                    : ""
-                }`}
+                className={`flex items-center justify-between p-4 border-b last:border-0 hover:bg-gray-50 transition-colors ${parcela.status === "VENCIDA"
+                  ? "bg-red-50 hover:bg-red-100/50"
+                  : ""
+                  }`}
               >
                 {/* Lado Esquerdo: Info */}
                 <div className="flex items-center gap-4">
                   <div
                     className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 
-                    ${
-                      parcela.status === "PAGO"
+                    ${parcela.status === "PAGA"
                         ? "bg-green-100 text-green-600"
-                        : parcela.status === "ATRASADO"
-                        ? "bg-red-100 text-red-600"
-                        : "bg-indigo-50 text-indigo-600"
-                    }`}
+                        : parcela.status === "VENCIDA"
+                          ? "bg-red-100 text-red-600"
+                          : "bg-indigo-50 text-indigo-600"
+                      }`}
                   >
-                    {parcela.status === "PAGO" ? (
+                    {parcela.status === "PAGA" ? (
                       <CheckCircle2 size={20} />
-                    ) : parcela.status === "ATRASADO" ? (
+                    ) : parcela.status === "VENCIDA" ? (
                       <AlertCircle size={20} />
                     ) : (
                       <DollarSign size={20} />
@@ -158,11 +238,10 @@ export default function PagamentosPage() {
                       Parcela #{parcela.id}
                     </p>
                     <p
-                      className={`text-sm ${
-                        parcela.status === "ATRASADO"
-                          ? "text-red-600 font-medium"
-                          : "text-gray-500"
-                      }`}
+                      className={`text-sm ${parcela.status === "VENCIDA"
+                        ? "text-red-600 font-medium"
+                        : "text-gray-500"
+                        }`}
                     >
                       Vence em {parcela.vencimento}
                     </p>
@@ -175,7 +254,7 @@ export default function PagamentosPage() {
                     R$ {parcela.valor.toFixed(2)}
                   </span>
 
-                  {parcela.status === "PAGO" ? (
+                  {parcela.status === "PAGA" ? (
                     <span className="px-3 py-1 bg-gray-100 text-gray-500 text-xs font-medium rounded-full border border-gray-200">
                       PAGO
                     </span>
@@ -183,10 +262,9 @@ export default function PagamentosPage() {
                     <button
                       onClick={() => handlePagar(parcela)}
                       className={`flex items-center gap-1 px-4 py-2 rounded-lg text-sm font-medium transition-colors
-                        ${
-                          parcela.status === "ATRASADO"
-                            ? "bg-red-600 hover:bg-red-700 text-white shadow-red-200 shadow-md"
-                            : "bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-200 shadow-md"
+                        ${parcela.status === "VENCIDA"
+                          ? "bg-red-600 hover:bg-red-700 text-white shadow-red-200 shadow-md"
+                          : "bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-200 shadow-md"
                         }`}
                     >
                       Pagar
@@ -227,25 +305,29 @@ export default function PagamentosPage() {
             <div className="bg-gray-50 p-4 rounded-xl border border-gray-100 mb-6 flex flex-col items-center">
               <p className="text-sm text-gray-500 mb-2">Escaneie o QR Code</p>
               {/* Placeholder do QR Code */}
-              <div className="w-48 h-48 bg-white border-2 border-indigo-100 rounded-lg flex items-center justify-center mb-4">
-                <div className="grid grid-cols-6 gap-1 opacity-20">
-                  {[...Array(36)].map((_, i) => (
-                    <div key={i} className="w-6 h-6 bg-black rounded-sm"></div>
-                  ))}
-                </div>
-              </div>
+              <img
+                src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=BOLETO-${selectedParcela.id}`}
+                alt="QR Code"
+                className="w-48 h-48 rounded-lg border-2 border-indigo-100 mb-4"
+              />
               <div className="text-2xl font-bold text-gray-800">
                 R$ {selectedParcela.valor.toFixed(2)}
               </div>
             </div>
 
             <button
+              onClick={abrirBoleto}
+              className="w-full mt-4 py-3.5 rounded-xl bg-purple-600 text-white font-bold hover:bg-purple-700 transition"
+            >
+              Abrir Boleto (PDF)
+            </button>
+
+            <button
               onClick={copiarPix}
-              className={`w-full py-3.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-all
-                ${
-                  pixCopiado
-                    ? "bg-green-500 text-white"
-                    : "bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-200"
+              className={`w-full mt-3 py-3.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-all
+    ${pixCopiado
+                  ? "bg-green-500 text-white"
+                  : "bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-200"
                 }`}
             >
               {pixCopiado ? (
