@@ -18,7 +18,6 @@ import {
   Target,
 } from "lucide-react";
 
-
 // ============================================
 // 1. TIPOS E INTERFACES
 // ============================================
@@ -53,7 +52,6 @@ interface FilterState {
 // 2. DADOS MOCK (depois virá do backend)
 // ============================================
 
-
 // ============================================
 // 3. FUNÇÕES AUXILIARES
 // ============================================
@@ -84,44 +82,54 @@ const getCategoryColor = (category: string): string => {
 export default function MarketplacePage() {
   const router = useRouter();
 
-
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
-const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(true);
 
+  useEffect(() => {
+    let isMounted = true; // ✅ Previne atualizações após desmontagem
 
-useEffect(() => {
-  const carregarPropostas = async () => {
-    try {
-      const propostas = await propostaService.listarAbertas(); 
-      
-      const convertidas: Opportunity[] = propostas.map((p) => ({
-        id: String(p.id),
-        meiName: "MEI",
-        businessName: p.nomeNegocio,
-        description: p.descricaoNegocio,
-        totalValue: p.valorSolicitado,
-        currentValue: p.saldoInvestido,
-        progress: Math.floor((p.saldoInvestido / p.valorSolicitado) * 100),
-        interestRate: p.taxaJuros, 
-        duration: p.prazoMeses,
-        minInvestment: 100,
-        risk: "Médio",
-        type: "Empréstimo",
-        category: p.categoria,
-        investors: 0,
-        daysLeft: 30,
-      }));
+    const carregarPropostas = async () => {
+      try {
+        const propostas = await propostaService.listarAbertas();
 
-      setOpportunities(convertidas);
-    } catch (error) {
-      console.error("Erro ao carregar propostas:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
+        if (!isMounted) return; // ✅ Verifica se ainda está montado
 
-  carregarPropostas();
-}, []);
+        const convertidas: Opportunity[] = propostas.map((p) => ({
+          id: String(p.id),
+          meiName: "MEI",
+          businessName: p.nomeNegocio,
+          description: p.descricaoNegocio,
+          totalValue: p.valorSolicitado,
+          currentValue: p.saldoInvestido,
+          progress: Math.floor((p.saldoInvestido / p.valorSolicitado) * 100),
+          interestRate: p.taxaJuros,
+          duration: p.prazoMeses,
+          minInvestment: 100,
+          risk: "Médio",
+          type: "Empréstimo",
+          category: p.categoria,
+          investors: 0,
+          daysLeft: 30,
+        }));
+
+        if (isMounted) {
+          setOpportunities(convertidas);
+        }
+      } catch (error) {
+        console.error("Erro ao carregar propostas:", error);
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    carregarPropostas();
+
+    return () => {
+      isMounted = false; // ✅ Cleanup function
+    };
+  }, []);
 
   // Estados dos filtros
   const [filters, setFilters] = useState<FilterState>({

@@ -26,6 +26,7 @@ export default function PagamentosPage() {
   const [selectedParcela, setSelectedParcela] =
     useState<ParcelaResponse | null>(null);
   const [pixCopiado, setPixCopiado] = useState(false);
+  const [boletoUrl, setBoletoUrl] = useState<string | null>(null);
   const [emprestimo, setEmprestimo] = useState<EmprestimoAtivo>({
     id: 1, // aqui você pode colocar o ID real do empréstimo
     valorTotal: 0,
@@ -34,6 +35,7 @@ export default function PagamentosPage() {
     parcelas: [],
   });
   const [loading, setLoading] = useState(true);
+  const [isUpdating, setIsUpdating] = useState(false); // ✅ Controle de atualização
 
   // Função para abrir o modal de pagamento
   const handlePagar = (parcela: ParcelaResponse) => {
@@ -44,6 +46,8 @@ export default function PagamentosPage() {
 
   // Copiar PIX
   const copiarPix = async () => {
+    if (isUpdating) return; // ✅ Previne múltiplas execuções
+
     navigator.clipboard.writeText(
       "00020126580014BR.GOV.BCB.PIX0136123e4567-e89b-12d3-a456-4266141740005204000053039865802BR5913Finexus P2P6008BRASILIA62070503***6304"
     );
@@ -54,7 +58,9 @@ export default function PagamentosPage() {
   };
 
   const pagarParcela = async () => {
-    if (!selectedParcela) return;
+    if (!selectedParcela || isUpdating) return; // ✅ Previne múltiplas chamadas
+
+    setIsUpdating(true);
 
     try {
       const userId = localStorage.getItem("userId");
@@ -76,15 +82,18 @@ export default function PagamentosPage() {
       console.log("Pagamento confirmado!");
     } catch (err) {
       console.error("Erro ao pagar parcela:", err);
+    } finally {
+      setIsUpdating(false);
     }
   };
 
   const abrirBoleto = async () => {
-    if (!selectedParcela) return;
+    if (!selectedParcela || isUpdating) return; // ✅ Previne múltiplas execuções
 
     try {
       const blob = await parcelaService.gerarBoleto(selectedParcela.id);
       const url = URL.createObjectURL(blob);
+      setBoletoUrl(url);
       window.open(url, "_blank");
 
       await pagarParcela(); // 👈 AQUI! Confirmar pagamento.
@@ -94,14 +103,18 @@ export default function PagamentosPage() {
   };
   // Pegar próximas parcelas do backend
   useEffect(() => {
+    let isMounted = true; // ✅ Previne atualizações após desmontagem
+
     const fetchParcelas = async () => {
       try {
         const userId = localStorage.getItem("userId");
-        if (!userId) return;
+        if (!userId || !isMounted) return;
 
         // Substitua pelo ID da dívida que você quer buscar
         const idDivida = 1;
         const parcelas = await parcelaService.listarPorDivida(idDivida);
+
+        if (!isMounted) return; // ✅ Verifica novamente antes de atualizar
 
         const valorPago = parcelas
           .filter((p) => p.status === "PAGA")
@@ -111,21 +124,29 @@ export default function PagamentosPage() {
 
         const progresso = Math.round((valorPago / valorTotal) * 100);
 
-        setEmprestimo({
-          id: idDivida,
-          valorTotal,
-          valorPago,
-          progresso,
-          parcelas,
-        });
+        if (isMounted) {
+          setEmprestimo({
+            id: idDivida,
+            valorTotal,
+            valorPago,
+            progresso,
+            parcelas,
+          });
+        }
       } catch (err) {
         console.error("Erro ao carregar parcelas:", err);
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     };
 
     fetchParcelas();
+
+    return () => {
+      isMounted = false; // ✅ Cleanup function
+    };
   }, []);
 
   if (loading) return <p className="p-6 text-center">Carregando parcelas...</p>;
