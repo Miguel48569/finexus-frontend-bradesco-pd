@@ -1,11 +1,5 @@
 import React, { useState } from "react";
-import {
-  TrendingUp,
-  TrendingDown,
-  DollarSign,
-  PieChart,
-  Download,
-} from "lucide-react";
+import { TrendingUp, TrendingDown, DollarSign, Download } from "lucide-react";
 import {
   LineChart,
   Line,

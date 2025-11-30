@@ -172,7 +172,7 @@ export default function FormLogin() {
       </div>
 
       {/* Formulário */}
-      <div className="space-y-4 sm:space-y-5">
+      <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-5">
         {/* Campo CPF */}
         <div>
           <label
@@ -259,14 +259,13 @@ export default function FormLogin() {
 
         {/* Botão de Submit */}
         <button
-          type="button"
-          onClick={handleSubmit}
+          type="submit"
           disabled={isLoading}
           className="w-full justify-center py-2.5 sm:py-3 px-4 rounded-lg shadow-md font-bold text-sm sm:text-base text-white bg-violet-700 hover:bg-violet-600 disabled:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-violet-500 transition-all duration-300 transform hover:-translate-y-0.5 hover:shadow-lg hover:shadow-violet-500/50 disabled:cursor-not-allowed disabled:transform-none"
         >
           {isLoading ? "Entrando..." : "Entrar"}
         </button>
-      </div>
+      </form>
 
       {/* Links Inferiores */}
       <div className="mt-5 sm:mt-6 text-center text-xs sm:text-sm space-y-2">

@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import {
   TrendingUp,
   Activity,
@@ -13,7 +13,13 @@ import {
   Coffee,
   Scissors,
   Users,
+  ArrowDownToLine,
+  X,
+  CheckCircle2,
+  AlertCircle,
 } from "lucide-react";
+import { saldoService, SaldoResponse } from "@/services/saldo";
+import { investimentoService } from "@/services/investimento";
 
 interface Investment {
   id: string;
@@ -38,8 +44,20 @@ interface AllocationItem {
 }
 
 const MinhaCarteira = () => {
+  const [saldoDisponivel, setSaldoDisponivel] = useState(0);
+  const [portfolioTotal, setPortfolioTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [modalResgateOpen, setModalResgateOpen] = useState(false);
+  const [resgatando, setResgatando] = useState(false);
+  const [mensagem, setMensagem] = useState<{
+    tipo: "sucesso" | "erro";
+    texto: string;
+  } | null>(null);
+  const [investments, setInvestments] = useState<Investment[]>([]);
+  const [saldoExiste, setSaldoExiste] = useState(true); // Flag para saber se o saldo existe no backend
+
   const portfolioData = {
-    totalEquity: 78900.0,
+    totalEquity: portfolioTotal,
     totalReturn: 57.8,
     monthlyReturn: 4.2,
     monthlyDividends: 892.5,
@@ -54,84 +72,6 @@ const MinhaCarteira = () => {
     activeInvestments: 8,
     completedInvestments: 3,
   };
-
-  const investments: Investment[] = [
-    {
-      id: "1",
-      meiName: "Maria Silva",
-      businessName: "Cafeteria Aroma Bom",
-      category: "Alimentação",
-      icon: <Coffee className="w-5 h-5" />,
-      type: "Empréstimo",
-      investedAmount: 5000,
-      currentValue: 5684,
-      interestRate: 1.8,
-      duration: 36,
-      progress: 65,
-      returnPercentage: 13.68,
-      status: "Ativo",
-    },
-    {
-      id: "2",
-      meiName: "João Santos",
-      businessName: "Loja de Roupas Fashion",
-      category: "Varejo",
-      icon: <Store className="w-5 h-5" />,
-      type: "Financiamento",
-      investedAmount: 8000,
-      currentValue: 8847,
-      interestRate: 1.5,
-      duration: 48,
-      progress: 42,
-      returnPercentage: 10.59,
-      status: "Ativo",
-    },
-    {
-      id: "3",
-      meiName: "Ana Costa",
-      businessName: "Delivery Express",
-      category: "Logística",
-      icon: <Truck className="w-5 h-5" />,
-      type: "Empréstimo",
-      investedAmount: 6500,
-      currentValue: 6945,
-      interestRate: 1.2,
-      duration: 24,
-      progress: 88,
-      returnPercentage: 6.85,
-      status: "Ativo",
-    },
-    {
-      id: "4",
-      meiName: "Carlos Oliveira",
-      businessName: "Salão Corte & Estilo",
-      category: "Beleza",
-      icon: <Scissors className="w-5 h-5" />,
-      type: "Financiamento",
-      investedAmount: 4500,
-      currentValue: 4860,
-      interestRate: 1.6,
-      duration: 30,
-      progress: 73,
-      returnPercentage: 8.01,
-      status: "Ativo",
-    },
-    {
-      id: "5",
-      meiName: "Paula Ferreira",
-      businessName: "Empório Natural",
-      category: "Alimentação",
-      icon: <Package className="w-5 h-5" />,
-      type: "Empréstimo",
-      investedAmount: 3500,
-      currentValue: 3640,
-      interestRate: 1.4,
-      duration: 18,
-      progress: 56,
-      returnPercentage: 4.0,
-      status: "Ativo",
-    },
-  ];
 
   const allocation: AllocationItem[] = [
     { category: "Alimentação", percentage: 35, color: "#8b5cf6" },
@@ -154,6 +94,22 @@ const MinhaCarteira = () => {
     { month: "Out", value: 73200 },
     { month: "Nov", value: 78900 },
   ];
+
+  // Função auxiliar para obter ícone por categoria
+  const getCategoryIcon = (category: string) => {
+    switch (category) {
+      case "Alimentação":
+        return <Coffee className="w-5 h-5" />;
+      case "Varejo":
+        return <Store className="w-5 h-5" />;
+      case "Logística":
+        return <Truck className="w-5 h-5" />;
+      case "Beleza":
+        return <Scissors className="w-5 h-5" />;
+      default:
+        return <Package className="w-5 h-5" />;
+    }
+  };
 
   const totalInvestedValue = investments.reduce(
     (acc, inv) => acc + inv.investedAmount,
@@ -192,6 +148,208 @@ const MinhaCarteira = () => {
     }
   };
 
+  useEffect(() => {
+    const carregarDados = async () => {
+      try {
+        const userId = localStorage.getItem("userId");
+        const userProfile = localStorage.getItem("userProfile");
+
+        console.log("🔍 Dados do localStorage:", { userId, userProfile });
+
+        if (!userId) {
+          console.error("❌ Usuário não encontrado no localStorage");
+          // Mesmo sem userId, mostra a página com valores zerados
+          setSaldoDisponivel(0);
+          setPortfolioTotal(0);
+          setInvestments([]);
+          setLoading(false);
+          return;
+        }
+
+        console.log("🔍 Carregando dados para userId:", userId);
+
+        // Inicializa com valores padrão
+        let saldoValor = 0;
+        let investimentosList: Investment[] = [];
+
+        // Tenta carregar saldo
+        try {
+          const saldoData = await saldoService.buscarPorUsuario(Number(userId));
+          console.log("✅ Saldo recebido:", saldoData);
+          saldoValor = saldoData.valor || 0;
+          setSaldoDisponivel(saldoValor);
+          setSaldoExiste(true); // Saldo existe no backend
+        } catch (saldoError: any) {
+          const statusCode = saldoError?.response?.status;
+          console.warn(
+            `⚠️ Saldo não encontrado (${statusCode}). Usando valor padrão 0.`
+          );
+
+          // Se for 404, significa que o saldo não existe no backend
+          if (statusCode === 404) {
+            saldoValor = 0;
+            setSaldoDisponivel(0);
+            setSaldoExiste(false); // Marca que o saldo não existe
+            console.warn(
+              "⚠️ Saldo não cadastrado no backend. Resgate desabilitado."
+            );
+          } else {
+            console.error(
+              "❌ Erro ao carregar saldo:",
+              saldoError?.response?.data
+            );
+            setSaldoDisponivel(0);
+            setSaldoExiste(false);
+          }
+        }
+
+        // Tenta carregar investimentos
+        try {
+          const investimentosData =
+            await investimentoService.listarPorInvestidor(Number(userId));
+
+          console.log("✅ Investimentos recebidos:", investimentosData);
+
+          if (
+            Array.isArray(investimentosData) &&
+            investimentosData.length > 0
+          ) {
+            // Converte investimentos do backend para o formato do frontend
+            investimentosList = investimentosData.map((inv) => {
+              const categoria = inv.proposta?.categoria || "Outros";
+              const valorAtual =
+                inv.valorInvestido + (inv.rendimentoEsperado || 0);
+              const retorno =
+                inv.valorInvestido > 0
+                  ? ((valorAtual - inv.valorInvestido) / inv.valorInvestido) *
+                    100
+                  : 0;
+
+              // Calcula progresso (se tiver data de investimento, calcula baseado no prazo)
+              const dataInv = new Date(inv.dataInvestimento);
+              const hoje = new Date();
+              const mesesDecorridos = Math.floor(
+                (hoje.getTime() - dataInv.getTime()) /
+                  (1000 * 60 * 60 * 24 * 30)
+              );
+              const prazo = inv.proposta?.prazoMeses || 12;
+              const progresso = Math.min(
+                Math.floor((mesesDecorridos / prazo) * 100),
+                100
+              );
+
+              return {
+                id: String(inv.id),
+                meiName: inv.investidor?.nome || "MEI",
+                businessName: inv.proposta?.nomeNegocio || "Negócio",
+                category: categoria,
+                icon: getCategoryIcon(categoria),
+                type: "Empréstimo",
+                investedAmount: inv.valorInvestido,
+                currentValue: valorAtual,
+                interestRate: inv.proposta?.taxaJuros || 0,
+                duration: prazo,
+                progress: progresso,
+                returnPercentage: retorno,
+                status: inv.status === "CONFIRMADO" ? "Ativo" : "Em Andamento",
+              };
+            });
+
+            setInvestments(investimentosList);
+
+            const totalInvestido = investimentosData.reduce(
+              (acc, inv) => acc + inv.valorInvestido,
+              0
+            );
+            setPortfolioTotal(saldoValor + totalInvestido);
+          } else {
+            console.log("📊 Array de investimentos vazio");
+            setInvestments([]);
+            setPortfolioTotal(saldoValor);
+          }
+        } catch (invError: any) {
+          const statusCode = invError?.response?.status;
+          console.warn(
+            `⚠️ Investimentos não encontrados (${statusCode}). Lista vazia.`
+          );
+
+          if (statusCode === 404) {
+            console.log("ℹ️ Nenhum investimento encontrado para este usuário");
+          } else {
+            console.error(
+              "❌ Erro ao carregar investimentos:",
+              invError?.response?.data
+            );
+          }
+
+          setInvestments([]);
+          setPortfolioTotal(saldoValor);
+        }
+      } catch (error) {
+        console.error("❌ Erro geral ao carregar dados:", error);
+        setInvestments([]);
+        setSaldoDisponivel(0);
+        setPortfolioTotal(0);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    carregarDados();
+  }, []);
+
+  const handleResgatar = async () => {
+    if (saldoDisponivel <= 0) {
+      setMensagem({ tipo: "erro", texto: "Saldo insuficiente para resgate" });
+      return;
+    }
+
+    setResgatando(true);
+    setMensagem(null);
+
+    try {
+      const userId = localStorage.getItem("userId");
+      if (!userId) throw new Error("Usuário não encontrado");
+
+      await saldoService.resgatar({
+        valor: saldoDisponivel, // Resgata todo o saldo disponível
+        usuarioId: Number(userId),
+      });
+
+      // Atualiza saldo local para 0
+      setSaldoDisponivel(0);
+      setPortfolioTotal((prev) => prev - saldoDisponivel);
+
+      setMensagem({
+        tipo: "sucesso",
+        texto:
+          "Resgate solicitado com sucesso! O dinheiro será transferido em até 2 dias úteis.",
+      });
+
+      // Fecha modal após 3 segundos
+      setTimeout(() => {
+        setModalResgateOpen(false);
+        setMensagem(null);
+      }, 3000);
+    } catch (error: any) {
+      console.error("Erro ao resgatar:", error);
+      const mensagemErro =
+        error?.response?.data?.message ||
+        "Erro ao processar resgate. Tente novamente.";
+      setMensagem({ tipo: "erro", texto: mensagemErro });
+    } finally {
+      setResgatando(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-violet-50 flex items-center justify-center">
+        <p className="text-violet-600 font-semibold">Carregando carteira...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-violet-50 p-8">
       <div className="max-w-7xl mx-auto">
@@ -218,8 +376,139 @@ const MinhaCarteira = () => {
           </div>
         </div>
 
-        {/* Top Stats Card */}
+        {/* Alerta quando saldo não existe */}
+        {!saldoExiste && (
+          <div className="bg-amber-50 border-2 border-amber-300 rounded-xl p-4 mb-6 flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="font-semibold text-amber-900 mb-1">
+                Saldo não cadastrado no sistema
+              </p>
+              <p className="text-sm text-amber-700">
+                O registro de saldo não foi encontrado no backend. Isso pode
+                ocorrer se você ainda não realizou nenhuma transação. Entre em
+                contato com o suporte ou faça um investimento para inicializar
+                seu saldo.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Mensagem de feedback temporária */}
+        {mensagem && !modalResgateOpen && (
+          <div
+            className={`mb-6 p-4 rounded-xl flex items-center gap-3 ${
+              mensagem.tipo === "sucesso"
+                ? "bg-green-50 border border-green-200"
+                : "bg-red-50 border border-red-200"
+            }`}
+          >
+            {mensagem.tipo === "sucesso" ? (
+              <CheckCircle2 className="w-5 h-5 text-green-600" />
+            ) : (
+              <AlertCircle className="w-5 h-5 text-red-600" />
+            )}
+            <p
+              className={`text-sm font-medium ${
+                mensagem.tipo === "sucesso" ? "text-green-800" : "text-red-800"
+              }`}
+            >
+              {mensagem.texto}
+            </p>
+          </div>
+        )}
+
+        {/* Card de Portfólio com Saldo Disponível */}
         <div className="bg-gradient-to-br from-violet-600 via-violet-500 to-purple-600 rounded-3xl p-8 mb-6 text-white shadow-2xl">
+          <div className="flex justify-between items-center mb-6">
+            <div>
+              <p className="text-violet-100 text-sm mb-2">Portfólio Total</p>
+              <p className="text-5xl font-bold">
+                R${" "}
+                {portfolioTotal.toLocaleString("pt-BR", {
+                  minimumFractionDigits: 2,
+                })}
+              </p>
+              <p className="text-violet-200 text-sm mt-1">
+                Saldo disponível para movimentação
+              </p>
+            </div>
+            <button
+              onClick={() => {
+                if (!saldoExiste) {
+                  setMensagem({
+                    tipo: "erro",
+                    texto:
+                      "Saldo não disponível. O registro de saldo não foi encontrado no sistema.",
+                  });
+                  setTimeout(() => setMensagem(null), 3000);
+                  return;
+                }
+                if (saldoDisponivel <= 0) {
+                  setMensagem({
+                    tipo: "erro",
+                    texto: "Você não possui saldo disponível para resgate.",
+                  });
+                  setTimeout(() => setMensagem(null), 3000);
+                  return;
+                }
+                setModalResgateOpen(true);
+              }}
+              disabled={!saldoExiste || saldoDisponivel <= 0}
+              className={`px-6 py-3 rounded-xl font-bold transition-all shadow-lg flex items-center gap-2 ${
+                !saldoExiste || saldoDisponivel <= 0
+                  ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                  : "bg-white text-violet-600 hover:bg-violet-50 hover:scale-105"
+              }`}
+              title={
+                !saldoExiste
+                  ? "Saldo não cadastrado no sistema"
+                  : saldoDisponivel <= 0
+                  ? "Sem saldo disponível"
+                  : "Resgatar saldo"
+              }
+            >
+              <ArrowDownToLine size={20} />
+              Resgatar
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20">
+              <p className="text-violet-100 text-sm mb-2">Carteira Total</p>
+              <p className="text-2xl font-bold">
+                R${" "}
+                {(portfolioTotal - saldoDisponivel).toLocaleString("pt-BR", {
+                  minimumFractionDigits: 2,
+                })}
+              </p>
+              <p className="text-violet-200 text-xs mt-1">Investido em MEIs</p>
+            </div>
+            <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20">
+              <p className="text-violet-100 text-sm mb-2">Empréstimos</p>
+              <p className="text-2xl font-bold">5</p>
+              <p className="text-violet-200 text-xs mt-1">Ativos</p>
+            </div>
+            <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20">
+              <p className="text-violet-100 text-sm mb-2">Variação Total</p>
+              <p className="text-2xl font-bold">+37.8%</p>
+              <p className="text-violet-200 text-xs mt-1">58.00%</p>
+            </div>
+            <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20">
+              <p className="text-violet-100 text-sm mb-2">Disponível</p>
+              <p className="text-2xl font-bold">
+                R${" "}
+                {saldoDisponivel.toLocaleString("pt-BR", {
+                  minimumFractionDigits: 2,
+                })}
+              </p>
+              <p className="text-violet-200 text-xs mt-1">Para resgate</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Top Stats Card - REMOVIDO, substituído pelo card acima */}
+        <div className="hidden bg-gradient-to-br from-violet-600 via-violet-500 to-purple-600 rounded-3xl p-8 mb-6 text-white shadow-2xl">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
             <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-4 border border-white/20">
               <p className="text-violet-100 text-sm mb-2 flex items-center gap-2">
@@ -566,111 +855,133 @@ const MinhaCarteira = () => {
                 </tr>
               </thead>
               <tbody>
-                {investments.map((investment) => (
-                  <tr
-                    key={investment.id}
-                    className="border-b border-gray-100 hover:bg-violet-50/50 transition-colors"
-                  >
-                    <td className="py-5 px-4">
-                      <div className="flex items-center gap-3">
-                        <div
-                          className={`p-2 rounded-lg ${getCategoryColor(
-                            investment.category
-                          )}`}
-                        >
-                          {investment.icon}
+                {investments.length === 0 ? (
+                  <tr>
+                    <td colSpan={9} className="py-12 text-center">
+                      <div className="flex flex-col items-center gap-3">
+                        <div className="bg-violet-100 p-4 rounded-full">
+                          <Store className="w-8 h-8 text-violet-600" />
                         </div>
-                        <div>
-                          <p className="text-sm font-bold text-gray-900">
-                            {investment.businessName}
-                          </p>
-                          <p className="text-xs text-gray-500">
-                            {investment.interestRate}% a.m. •{" "}
-                            {investment.duration} meses
-                          </p>
-                        </div>
+                        <p className="text-gray-600 font-medium">
+                          Você ainda não possui investimentos
+                        </p>
+                        <p className="text-sm text-gray-400">
+                          Explore o marketplace para começar a investir em MEIs
+                        </p>
                       </div>
-                    </td>
-                    <td className="py-5 px-4 text-sm text-gray-700 font-medium">
-                      {investment.meiName}
-                    </td>
-                    <td className="py-5 px-4">
-                      <span
-                        className={`px-3 py-1 rounded-lg text-xs font-semibold border ${getCategoryColor(
-                          investment.category
-                        )}`}
-                      >
-                        {investment.category}
-                      </span>
-                    </td>
-                    <td className="py-5 px-4">
-                      <span className="px-3 py-1 rounded-lg text-xs font-semibold bg-violet-100 text-violet-700 border border-violet-200">
-                        {investment.type}
-                      </span>
-                    </td>
-                    <td className="py-5 px-4 text-sm text-gray-700 text-right font-medium">
-                      R${" "}
-                      {investment.investedAmount.toLocaleString("pt-BR", {
-                        minimumFractionDigits: 2,
-                      })}
-                    </td>
-                    <td className="py-5 px-4 text-sm font-bold text-gray-900 text-right">
-                      R${" "}
-                      {investment.currentValue.toLocaleString("pt-BR", {
-                        minimumFractionDigits: 2,
-                      })}
-                    </td>
-                    <td className="py-5 px-4">
-                      <div className="flex flex-col items-center gap-1">
-                        <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
-                          <div
-                            className="h-full bg-gradient-to-r from-violet-500 to-purple-500 rounded-full transition-all"
-                            style={{ width: `${investment.progress}%` }}
-                          />
-                        </div>
-                        <span className="text-xs font-semibold text-violet-600">
-                          {investment.progress}%
-                        </span>
-                      </div>
-                    </td>
-                    <td className="py-5 px-4 text-right">
-                      <span className="text-sm font-bold text-green-600 flex items-center justify-end gap-1">
-                        <TrendingUp className="w-4 h-4" />+
-                        {investment.returnPercentage.toFixed(2)}%
-                      </span>
-                    </td>
-                    <td className="py-5 px-4 text-center">
-                      <span
-                        className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(
-                          investment.status
-                        )}`}
-                      >
-                        {investment.status}
-                      </span>
                     </td>
                   </tr>
-                ))}
-                <tr className="bg-gradient-to-r from-violet-50 to-purple-50 font-bold">
-                  <td
-                    colSpan={4}
-                    className="py-4 px-4 text-right text-sm text-gray-900"
-                  >
-                    Totais:
-                  </td>
-                  <td className="py-4 px-4 text-sm text-gray-900 text-right">
-                    R${" "}
-                    {totalInvestedValue.toLocaleString("pt-BR", {
-                      minimumFractionDigits: 2,
-                    })}
-                  </td>
-                  <td className="py-4 px-4 text-sm text-gray-900 text-right font-bold">
-                    R${" "}
-                    {totalCurrentValue.toLocaleString("pt-BR", {
-                      minimumFractionDigits: 2,
-                    })}
-                  </td>
-                  <td colSpan={3}></td>
-                </tr>
+                ) : (
+                  <>
+                    {investments.map((investment) => (
+                      <tr
+                        key={investment.id}
+                        className="border-b border-gray-100 hover:bg-violet-50/50 transition-colors"
+                      >
+                        <td className="py-5 px-4">
+                          <div className="flex items-center gap-3">
+                            <div
+                              className={`p-2 rounded-lg ${getCategoryColor(
+                                investment.category
+                              )}`}
+                            >
+                              {investment.icon}
+                            </div>
+                            <div>
+                              <p className="text-sm font-bold text-gray-900">
+                                {investment.businessName}
+                              </p>
+                              <p className="text-xs text-gray-500">
+                                {investment.interestRate}% a.m. •{" "}
+                                {investment.duration} meses
+                              </p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-5 px-4 text-sm text-gray-700 font-medium">
+                          {investment.meiName}
+                        </td>
+                        <td className="py-5 px-4">
+                          <span
+                            className={`px-3 py-1 rounded-lg text-xs font-semibold border ${getCategoryColor(
+                              investment.category
+                            )}`}
+                          >
+                            {investment.category}
+                          </span>
+                        </td>
+                        <td className="py-5 px-4">
+                          <span className="px-3 py-1 rounded-lg text-xs font-semibold bg-violet-100 text-violet-700 border border-violet-200">
+                            {investment.type}
+                          </span>
+                        </td>
+                        <td className="py-5 px-4 text-sm text-gray-700 text-right font-medium">
+                          R${" "}
+                          {investment.investedAmount.toLocaleString("pt-BR", {
+                            minimumFractionDigits: 2,
+                          })}
+                        </td>
+                        <td className="py-5 px-4 text-sm font-bold text-gray-900 text-right">
+                          R${" "}
+                          {investment.currentValue.toLocaleString("pt-BR", {
+                            minimumFractionDigits: 2,
+                          })}
+                        </td>
+                        <td className="py-5 px-4">
+                          <div className="flex flex-col items-center gap-1">
+                            <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+                              <div
+                                className="h-full bg-gradient-to-r from-violet-500 to-purple-500 rounded-full transition-all"
+                                style={{ width: `${investment.progress}%` }}
+                              />
+                            </div>
+                            <span className="text-xs font-semibold text-violet-600">
+                              {investment.progress}%
+                            </span>
+                          </div>
+                        </td>
+                        <td className="py-5 px-4 text-right">
+                          <span className="text-sm font-bold text-green-600 flex items-center justify-end gap-1">
+                            <TrendingUp className="w-4 h-4" />+
+                            {investment.returnPercentage.toFixed(2)}%
+                          </span>
+                        </td>
+                        <td className="py-5 px-4 text-center">
+                          <span
+                            className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(
+                              investment.status
+                            )}`}
+                          >
+                            {investment.status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                    {investments.length > 0 && (
+                      <tr className="bg-gradient-to-r from-violet-50 to-purple-50 font-bold">
+                        <td
+                          colSpan={4}
+                          className="py-4 px-4 text-right text-sm text-gray-900"
+                        >
+                          Totais:
+                        </td>
+                        <td className="py-4 px-4 text-sm text-gray-900 text-right">
+                          R${" "}
+                          {totalInvestedValue.toLocaleString("pt-BR", {
+                            minimumFractionDigits: 2,
+                          })}
+                        </td>
+                        <td className="py-4 px-4 text-sm text-gray-900 text-right font-bold">
+                          R${" "}
+                          {totalCurrentValue.toLocaleString("pt-BR", {
+                            minimumFractionDigits: 2,
+                          })}
+                        </td>
+                        <td colSpan={3}></td>
+                      </tr>
+                    )}
+                  </>
+                )}
               </tbody>
             </table>
           </div>
@@ -707,6 +1018,97 @@ const MinhaCarteira = () => {
           </div>
         </div>
       </div>
+
+      {/* Modal de Resgate */}
+      {modalResgateOpen && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 relative animate-in fade-in zoom-in duration-200">
+            <button
+              onClick={() => {
+                setModalResgateOpen(false);
+                setMensagem(null);
+              }}
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition"
+            >
+              <X size={24} />
+            </button>
+
+            <div className="text-center mb-6">
+              <div className="w-16 h-16 bg-violet-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <ArrowDownToLine className="w-8 h-8 text-violet-600" />
+              </div>
+              <h3 className="text-2xl font-bold text-gray-900">
+                Resgatar Dinheiro
+              </h3>
+              <p className="text-gray-500 mt-1">Saldo Disponível</p>
+              <p className="text-3xl font-bold text-violet-600 mt-2">
+                R${" "}
+                {saldoDisponivel.toLocaleString("pt-BR", {
+                  minimumFractionDigits: 2,
+                })}
+              </p>
+              <p className="text-xs text-violet-600 mt-2 font-medium">
+                Todo o saldo será resgatado
+              </p>
+            </div>
+
+            {mensagem && (
+              <div
+                className={`mb-4 p-4 rounded-xl flex items-center gap-3 ${
+                  mensagem.tipo === "sucesso"
+                    ? "bg-green-50 border border-green-200"
+                    : "bg-red-50 border border-red-200"
+                }`}
+              >
+                {mensagem.tipo === "sucesso" ? (
+                  <CheckCircle2 className="w-5 h-5 text-green-600" />
+                ) : (
+                  <AlertCircle className="w-5 h-5 text-red-600" />
+                )}
+                <p
+                  className={`text-sm font-medium ${
+                    mensagem.tipo === "sucesso"
+                      ? "text-green-800"
+                      : "text-red-800"
+                  }`}
+                >
+                  {mensagem.texto}
+                </p>
+              </div>
+            )}
+
+            <div className="space-y-4">
+              <button
+                onClick={handleResgatar}
+                disabled={
+                  resgatando ||
+                  mensagem?.tipo === "sucesso" ||
+                  saldoDisponivel <= 0
+                }
+                className="w-full py-3.5 bg-violet-600 text-white font-bold rounded-xl hover:bg-violet-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-violet-200 flex items-center justify-center gap-2"
+              >
+                {resgatando ? (
+                  "Processando..."
+                ) : mensagem?.tipo === "sucesso" ? (
+                  <>
+                    <CheckCircle2 size={20} />
+                    Resgate Confirmado!
+                  </>
+                ) : (
+                  <>
+                    <DollarSign size={20} />
+                    Confirmar Resgate Total
+                  </>
+                )}
+              </button>
+
+              <p className="text-xs text-center text-gray-400">
+                O dinheiro será transferido em até 2 dias úteis.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

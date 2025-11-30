@@ -9,6 +9,7 @@ export interface Investidor {
 export interface PropostaResumo {
   id: number;
   nomeNegocio: string;
+  categoria: string;
   valorSolicitado: number;
   saldoInvestido: number;
   taxaJuros: number;

@@ -1,7 +1,13 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { TrendingUp, DollarSign, CheckCircle, X } from "lucide-react";
+import {
+  TrendingUp,
+  DollarSign,
+  CheckCircle,
+  X,
+  AlertCircle,
+} from "lucide-react";
 import {
   PieChart,
   Pie,
@@ -14,8 +20,10 @@ import {
   YAxis,
   Tooltip,
 } from "recharts";
-import { propostaService, PropostaResponse } from "@/services/proposta";
-import { saldoService, SaldoResponse } from "@/services/saldo";
+import { propostaService } from "@/services/proposta";
+import { saldoService } from "@/services/saldo";
+import dividaService from "@/services/divida";
+import { parcelaService } from "@/services/parcela";
 
 type StatusProposta =
   | "ABERTA"
@@ -41,8 +49,14 @@ export default function DashboardMEI() {
   const [showResgatarModal, setShowResgatarModal] = useState(false);
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
   const [emprestimos, setEmprestimos] = useState<Emprestimo[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string>("");
+  const [saldo, setSaldo] = useState<number>(0);
+  const [resgatando, setResgatando] = useState(false);
+  const [mensagem, setMensagem] = useState<{
+    tipo: "sucesso" | "erro";
+    texto: string;
+  } | null>(null);
+  const [totalDivida, setTotalDivida] = useState(0);
+  const [totalPago, setTotalPago] = useState(0);
 
   // Busca propostas do backend
   useEffect(() => {
@@ -62,8 +76,6 @@ export default function DashboardMEI() {
       try {
         const userId = localStorage.getItem("userId");
         if (!userId) {
-          setError("Usuário não encontrado");
-          setLoading(false);
           return;
         }
 
@@ -86,11 +98,29 @@ export default function DashboardMEI() {
         }));
 
         setEmprestimos(emprestimosConvertidos);
-      } catch (error: any) {
+
+        // Busca dívidas para cálculos mais precisos
+        try {
+          const dividas = await dividaService.getByTomador(parseInt(userId));
+          const totalDividaAtual = dividas.reduce(
+            (acc, d) => acc + d.valorTotal,
+            0
+          );
+          setTotalDivida(totalDividaAtual);
+
+          // Busca parcelas pagas
+          let totalParcelas = 0;
+          for (const divida of dividas) {
+            const parcelas = await parcelaService.listarPorDivida(divida.id);
+            const pagas = parcelas.filter((p) => p.status === "PAGA");
+            totalParcelas += pagas.reduce((acc, p) => acc + p.valor, 0);
+          }
+          setTotalPago(totalParcelas);
+        } catch (err) {
+          console.warn("⚠️ Não foi possível carregar dívidas:", err);
+        }
+      } catch (error) {
         console.error("❌ Erro ao buscar propostas:", error);
-        setError("Erro ao carregar empréstimos");
-      } finally {
-        setLoading(false);
       }
     };
 
@@ -112,18 +142,6 @@ export default function DashboardMEI() {
     }[status];
   };
 
-  // Função auxiliar para mapear status do backend
-  const mapearStatus = (status?: string): "Ativo" | "Quitado" | "Atrasado" => {
-    if (!status) return "Ativo";
-    const statusUpper = status.toUpperCase();
-    if (statusUpper.includes("APROVADO") || statusUpper.includes("ATIVO"))
-      return "Ativo";
-    if (statusUpper.includes("QUITADO") || statusUpper.includes("PAGO"))
-      return "Quitado";
-    if (statusUpper.includes("ATRASADO")) return "Atrasado";
-    return "Ativo";
-  };
-
   // Função auxiliar para calcular data de vencimento
   const calcularDataVencimento = (prazoMeses: number): string => {
     const hoje = new Date();
@@ -137,48 +155,113 @@ export default function DashboardMEI() {
     return new Date(data).toLocaleDateString("pt-BR");
   };
 
-  // Cálculos do dashboard
-  const saldoDisponivel = emprestimos.reduce(
-    (acc, e) => acc + (e.status === "ABERTA" ? e.valor : 0),
+  // Cálculos do dashboard baseados em dados reais
+  const carteiraTotal =
+    totalDivida > 0
+      ? totalDivida
+      : emprestimos.reduce((acc, e) => acc + e.valor, 0);
+  const percentualPago =
+    totalDivida > 0 ? ((totalPago / totalDivida) * 100).toFixed(1) : "0.0";
+  const emprestimosAtivos = emprestimos.filter(
+    (e) =>
+      e.status === "ABERTA" ||
+      e.status === "APROVADA" ||
+      e.status === "FINANCIADA"
+  );
+
+  // Dados do gráfico de pizza - distribuição dos empréstimos
+  const dadosPizza = emprestimosAtivos.map((e) => ({
+    name: e.empresa,
+    value: e.valor,
+  }));
+
+  const totalEmprestimos = dadosPizza.reduce(
+    (acc, item) => acc + item.value,
     0
   );
-  const saldoBloqueado = emprestimos.reduce(
-    (acc, e) => acc + (e.status === "ABERTA" ? e.valor - e.pago : 0),
-    0
-  );
-  const totalRecebido = emprestimos.reduce((acc, e) => acc + e.pago, 0);
-  const [saldo, setSaldo] = useState<number>(0);
-  const variacao = 37.8;
-  const variacaoValor = 21589.99;
-  const emprestimosAtivos = emprestimos.filter((e) => e.status === "ABERTA");
 
-  const dadosPizza = emprestimos
-    .filter((e) => e.status === "ABERTA")
-    .map((e) => ({
-      name: e.empresa,
-      value: e.valor,
-    }));
+  // Histórico mensal - acumulação de valor ao longo do tempo
+  const meses = [
+    "Jan",
+    "Fev",
+    "Mar",
+    "Abr",
+    "Mai",
+    "Jun",
+    "Jul",
+    "Ago",
+    "Set",
+    "Out",
+    "Nov",
+    "Dez",
+  ];
+  const mesAtual = new Date().getMonth();
+  const historicoMensal = meses.slice(0, mesAtual + 1).map((mes, index) => {
+    if (index === mesAtual) {
+      return { mes, valor: carteiraTotal };
+    }
+    // Simula crescimento gradual até o mês atual
+    return {
+      mes,
+      valor: Math.floor((carteiraTotal / (mesAtual + 1)) * (index + 1)),
+    };
+  });
 
-  const historicoMensal = [
-    { mes: "Jan", valor: 0 },
-    { mes: "Fev", valor: 0 },
-    { mes: "Mar", valor: 0 },
-    { mes: "Abr", valor: 0 },
-    { mes: "Mai", valor: 0 },
-    { mes: "Jun", valor: 0 },
-    { mes: "Jul", valor: 0 },
-    { mes: "Ago", valor: 0 },
-    { mes: "Set", valor: 0 },
-    { mes: "Out", valor: 0 },
-    { mes: "Nov", valor: totalRecebido },
+  const COLORS = [
+    "#7C3AED",
+    "#A78BFA",
+    "#EC4899",
+    "#C4B5FD",
+    "#8B5CF6",
+    "#D8B4FE",
   ];
 
-  const COLORS = ["#7C3AED", "#A78BFA", "#EC4899", "#C4B5FD"];
+  const handleResgatar = async () => {
+    if (saldo <= 0) {
+      setMensagem({
+        tipo: "erro",
+        texto: "Não há saldo disponível para resgate",
+      });
+      return;
+    }
 
-  const handleResgatar = () => {
-    setShowResgatarModal(false);
-    setShowSuccessMessage(true);
-    setTimeout(() => setShowSuccessMessage(false), 3000);
+    setResgatando(true);
+    setMensagem(null);
+
+    try {
+      const userId = localStorage.getItem("userId");
+      if (!userId) throw new Error("Usuário não encontrado");
+
+      await saldoService.resgatar({
+        valor: saldo, // Resgata todo o saldo
+        usuarioId: Number(userId),
+      });
+
+      // Zera o saldo local
+      setSaldo(0);
+
+      setMensagem({
+        tipo: "sucesso",
+        texto:
+          "Resgate realizado com sucesso! O dinheiro será transferido em até 2 dias úteis.",
+      });
+
+      // Fecha modal após 2 segundos
+      setTimeout(() => {
+        setShowResgatarModal(false);
+        setMensagem(null);
+        setShowSuccessMessage(true);
+        setTimeout(() => setShowSuccessMessage(false), 3000);
+      }, 2000);
+    } catch (error: unknown) {
+      console.error("Erro ao resgatar:", error);
+      const mensagemErro =
+        (error as { response?: { data?: { message?: string } } })?.response
+          ?.data?.message || "Erro ao processar resgate. Tente novamente.";
+      setMensagem({ tipo: "erro", texto: mensagemErro });
+    } finally {
+      setResgatando(false);
+    }
   };
 
   return (
@@ -198,12 +281,12 @@ export default function DashboardMEI() {
         <div className="bg-gradient-to-br from-violet-600 to-purple-700 rounded-3xl p-8 mb-8 text-white shadow-xl shadow-violet-500/50">
           <div className="flex justify-between items-center">
             <div className="flex-1">
-              <p className="text-violet-200 mb-2 text-sm">Portfolio Total</p>
+              <p className="text-violet-200 mb-2 text-sm">Saldo Disponível</p>
               <h1 className="text-5xl font-bold mb-2">
                 R$ {saldo.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
               </h1>
               <p className="text-violet-100 text-sm">
-                Saldo disponível para movimentação
+                Disponível para saque e investimentos
               </p>
             </div>
 
@@ -229,7 +312,7 @@ export default function DashboardMEI() {
             </div>
             <h2 className="text-2xl font-bold text-gray-800">
               R${" "}
-              {totalRecebido.toLocaleString("pt-BR", {
+              {carteiraTotal.toLocaleString("pt-BR", {
                 minimumFractionDigits: 2,
               })}
             </h2>
@@ -238,11 +321,13 @@ export default function DashboardMEI() {
           <div className="bg-white rounded-2xl p-6 shadow-md border border-violet-100">
             <div className="flex items-center gap-2 mb-2">
               <TrendingUp className="text-green-600" size={20} />
-              <p className="text-gray-500 text-sm">Variação Total</p>
+              <p className="text-gray-500 text-sm">Percentual Pago</p>
             </div>
-            <h2 className="text-2xl font-bold text-green-600">+{variacao}%</h2>
+            <h2 className="text-2xl font-bold text-green-600">
+              {percentualPago}%
+            </h2>
             <p className="text-sm text-gray-500">
-              +R$ {variacaoValor.toLocaleString("pt-BR")}
+              R$ {totalPago.toLocaleString("pt-BR")}
             </p>
           </div>
 
@@ -263,7 +348,7 @@ export default function DashboardMEI() {
               <p className="text-gray-500 text-sm">Disponível</p>
             </div>
             <h2 className="text-2xl font-bold text-gray-800">
-              R$ {saldoDisponivel.toLocaleString("pt-BR")}
+              R$ {saldo.toLocaleString("pt-BR")}
             </h2>
             <p className="text-sm text-gray-500">para resgate</p>
           </div>
@@ -271,7 +356,7 @@ export default function DashboardMEI() {
 
         {/* Gráficos */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-          {/* Performance vs Meta */}
+          {/* Histórico de Captação */}
           <div className="bg-white rounded-3xl p-6 shadow-lg border border-violet-100">
             <h3 className="text-xl font-bold text-gray-800 mb-4">
               Histórico de Captação
@@ -280,13 +365,28 @@ export default function DashboardMEI() {
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={historicoMensal}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-                  <XAxis dataKey="mes" stroke="#6B7280" />
-                  <YAxis stroke="#6B7280" />
+                  <XAxis
+                    dataKey="mes"
+                    stroke="#6B7280"
+                    style={{ fontSize: "12px" }}
+                  />
+                  <YAxis
+                    stroke="#6B7280"
+                    style={{ fontSize: "12px" }}
+                    tickFormatter={(value) =>
+                      `R$ ${(value / 1000).toFixed(0)}k`
+                    }
+                  />
                   <Tooltip
+                    formatter={(value: number) => [
+                      `R$ ${value.toLocaleString("pt-BR")}`,
+                      "Valor",
+                    ]}
                     contentStyle={{
-                      backgroundColor: "#fff",
+                      backgroundColor: "white",
                       border: "1px solid #E5E7EB",
-                      borderRadius: "8px",
+                      borderRadius: "0.75rem",
+                      padding: "0.75rem",
                     }}
                   />
                   <Line
@@ -308,63 +408,75 @@ export default function DashboardMEI() {
             </div>
           </div>
 
-          {/* Alocação de Ativos */}
+          {/* Distribuição dos Empréstimos */}
           <div className="bg-white rounded-3xl p-6 shadow-lg border border-violet-100">
             <h3 className="text-xl font-bold text-gray-800 mb-4">
               Distribuição dos Empréstimos
             </h3>
-            <div className="h-80 flex items-center justify-center">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={dadosPizza}
-                    innerRadius={80}
-                    outerRadius={120}
-                    dataKey="value"
-                    paddingAngle={5}
-                  >
-                    {dadosPizza.map((_, index) => (
-                      <Cell
-                        key={`cell-${index}`}
-                        fill={COLORS[index % COLORS.length]}
+            {dadosPizza.length > 0 ? (
+              <>
+                <div className="h-80 flex items-center justify-center">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={dadosPizza}
+                        innerRadius={80}
+                        outerRadius={120}
+                        dataKey="value"
+                        paddingAngle={5}
+                      >
+                        {dadosPizza.map((_, index) => (
+                          <Cell
+                            key={`cell-${index}`}
+                            fill={COLORS[index % COLORS.length]}
+                          />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        formatter={(value: number) =>
+                          `R$ ${value.toLocaleString("pt-BR")}`
+                        }
                       />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    formatter={(value: number) =>
-                      `R$ ${value.toLocaleString("pt-BR")}`
-                    }
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-            <div className="mt-4 space-y-2">
-              {dadosPizza.map((item, index) => (
-                <div
-                  key={index}
-                  className="flex items-center justify-between text-sm"
-                >
-                  <div className="flex items-center gap-2">
-                    <div
-                      className="w-3 h-3 rounded-full"
-                      style={{ backgroundColor: COLORS[index % COLORS.length] }}
-                    ></div>
-                    <span className="text-gray-700">{item.name}</span>
-                  </div>
-                  <span className="font-semibold text-gray-800">
-                    {(
-                      (item.value /
-                        emprestimosAtivos.reduce(
-                          (acc, e) => acc + e.valor,
-                          0
-                        )) *
-                      100
-                    ).toFixed(0)}
-                    %
-                  </span>
+                    </PieChart>
+                  </ResponsiveContainer>
                 </div>
-              ))}
-            </div>
+                <div className="mt-4 space-y-2">
+                  {dadosPizza.map((item, index) => (
+                    <div
+                      key={index}
+                      className="flex items-center justify-between text-sm"
+                    >
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="w-3 h-3 rounded-full"
+                          style={{
+                            backgroundColor: COLORS[index % COLORS.length],
+                          }}
+                        ></div>
+                        <span className="text-gray-700">{item.name}</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-gray-600">
+                          R$ {item.value.toLocaleString("pt-BR")}
+                        </span>
+                        <span className="font-semibold text-gray-800">
+                          {totalEmprestimos > 0
+                            ? ((item.value / totalEmprestimos) * 100).toFixed(0)
+                            : 0}
+                          %
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <div className="h-80 flex items-center justify-center">
+                <p className="text-gray-400 text-center">
+                  Nenhum empréstimo ativo no momento
+                </p>
+              </div>
+            )}
           </div>
         </div>
 
@@ -415,7 +527,9 @@ export default function DashboardMEI() {
                       </td>
                       <td className="py-4 px-4">
                         <span
-                          className={`px-3 py-1 rounded-full text-xs font-semibold ${badgeStyle(emp.status)}`}
+                          className={`px-3 py-1 rounded-full text-xs font-semibold ${badgeStyle(
+                            emp.status
+                          )}`}
                         >
                           {emp.status.replace("_", " ")}
                         </span>
@@ -466,7 +580,10 @@ export default function DashboardMEI() {
                   Resgatar Dinheiro
                 </h3>
                 <button
-                  onClick={() => setShowResgatarModal(false)}
+                  onClick={() => {
+                    setShowResgatarModal(false);
+                    setMensagem(null);
+                  }}
                   className="p-2 hover:bg-gray-100 rounded-full transition-colors"
                 >
                   <X size={24} />
@@ -477,60 +594,54 @@ export default function DashboardMEI() {
                 <div className="bg-gradient-to-br from-violet-100 to-purple-100 rounded-2xl p-6 text-center">
                   <p className="text-sm text-gray-600 mb-2">Saldo Disponível</p>
                   <h2 className="text-4xl font-bold text-gray-800">
-                    R$ {saldoDisponivel.toLocaleString("pt-BR")}
+                    R${" "}
+                    {saldo.toLocaleString("pt-BR", {
+                      minimumFractionDigits: 2,
+                    })}
                   </h2>
+                  <p className="text-xs text-violet-600 mt-2 font-medium">
+                    Todo o saldo será resgatado
+                  </p>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Dados Bancários
-                  </label>
-                  <div className="space-y-3">
-                    <label
-                      htmlFor="banco"
-                      className="text-gray-700 text-sm block font-medium mb-2"
+                {mensagem && (
+                  <div
+                    className={`p-4 rounded-xl flex items-center gap-3 ${
+                      mensagem.tipo === "sucesso"
+                        ? "bg-green-50 border border-green-200"
+                        : "bg-red-50 border border-red-200"
+                    }`}
+                  >
+                    {mensagem.tipo === "sucesso" ? (
+                      <CheckCircle className="w-5 h-5 text-green-600" />
+                    ) : (
+                      <AlertCircle className="w-5 h-5 text-red-600" />
+                    )}
+                    <p
+                      className={`text-sm font-medium ${
+                        mensagem.tipo === "sucesso"
+                          ? "text-green-800"
+                          : "text-red-800"
+                      }`}
                     >
-                      Banco
-                    </label>
-                    <input
-                      id="banco"
-                      type="text"
-                      placeholder="Banco"
-                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-violet-500 focus:outline-none transition-colors text-gray-800 placeholder-gray-400 bg-slate-100"
-                    />
-                    <label
-                      htmlFor="agencia"
-                      className="text-gray-700 text-sm block font-medium mb-2"
-                    >
-                      Agência
-                    </label>
-                    <input
-                      id="agencia"
-                      type="text"
-                      placeholder="Agência"
-                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-violet-500 focus:outline-none transition-colors placeholder-gray-400 bg-slate-100 text-gray-800"
-                    />
-                    <label
-                      htmlFor="conta"
-                      className="text-gray-700 text-sm block font-medium mb-2"
-                    >
-                      Conta
-                    </label>
-                    <input
-                      id="conta"
-                      type="text"
-                      placeholder="Conta"
-                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-violet-500 focus:outline-none transition-colors placeholder-gray-400 bg-slate-100 text-gray-800"
-                    />
+                      {mensagem.texto}
+                    </p>
                   </div>
-                </div>
+                )}
 
                 <button
                   onClick={handleResgatar}
-                  className="w-full bg-violet-600 hover:bg-violet-700 text-white font-semibold py-4 rounded-xl transition-all flex items-center justify-center gap-2 hover:scale-105 button-glow"
+                  disabled={
+                    resgatando || mensagem?.tipo === "sucesso" || saldo <= 0
+                  }
+                  className="w-full bg-violet-600 hover:bg-violet-700 text-white font-semibold py-4 rounded-xl transition-all flex items-center justify-center gap-2 hover:scale-105 button-glow disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <DollarSign size={20} />
-                  Confirmar Resgate
+                  {resgatando
+                    ? "Processando..."
+                    : mensagem?.tipo === "sucesso"
+                    ? "Resgate Confirmado!"
+                    : "Confirmar Resgate Total"}
                 </button>
 
                 <p className="text-xs text-gray-500 text-center">

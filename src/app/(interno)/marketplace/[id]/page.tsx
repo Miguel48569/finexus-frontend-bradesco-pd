@@ -5,7 +5,11 @@
 
 import { useState, useEffect, ChangeEvent } from "react";
 
-import { propostaService, PropostaRequest, PropostaResponse } from "@/services/proposta";
+import {
+  propostaService,
+  PropostaRequest,
+  PropostaResponse,
+} from "@/services/proposta";
 import { investimentoService } from "@/services/investimento";
 import { useParams, useRouter } from "next/navigation";
 import {
@@ -59,7 +63,6 @@ interface InvestmentDetails {
 // 2. DADOS MOCK (depois buscar do backend)
 // ============================================
 
-
 // ============================================
 // 3. FUNÇÕES AUXILIARES
 // ============================================
@@ -101,12 +104,22 @@ export default function DetalhesInvestimentoPage() {
 
   const realizarInvestimento = async () => {
     if (!userId) {
-      alert("Usuário não identificado.");
+      setResultadoInvestimento({
+        sucesso: false,
+        mensagem: "Usuário não identificado. Faça login novamente.",
+      });
+      setShowModalResultado(true);
+      setShowModalInvestir(false);
       return;
     }
 
     if (!investimento) {
-      alert("Proposta não encontrada.");
+      setResultadoInvestimento({
+        sucesso: false,
+        mensagem: "Proposta não encontrada.",
+      });
+      setShowModalResultado(true);
+      setShowModalInvestir(false);
       return;
     }
 
@@ -114,7 +127,23 @@ export default function DetalhesInvestimentoPage() {
 
     if (valor < investimento.minInvestment) {
       setErroMinimo(
-        `O valor mínimo para investir é R$ ${investimento.minInvestment.toLocaleString("pt-BR")}`
+        `O valor mínimo para investir é R$ ${investimento.minInvestment.toLocaleString(
+          "pt-BR"
+        )}`
+      );
+      return;
+    }
+
+    // Validação do valor máximo disponível na proposta
+    const saldoDisponivel = investimento.totalValue - investimento.currentValue;
+    if (valor > saldoDisponivel) {
+      setErroMinimo(
+        `O valor máximo disponível para investimento é R$ ${saldoDisponivel.toLocaleString(
+          "pt-BR",
+          {
+            minimumFractionDigits: 2,
+          }
+        )}`
       );
       return;
     }
@@ -123,24 +152,39 @@ export default function DetalhesInvestimentoPage() {
       const payload = {
         idInvestidor: userId,
         idProposta: Number(investimento.id),
-        valor: valor
+        valor: valor,
       };
 
       console.log("📤 Enviando investimento:", payload);
 
       await investimentoService.criar(payload);
 
-      alert("Investimento realizado com sucesso!");
-
+      setResultadoInvestimento({
+        sucesso: true,
+        mensagem:
+          "Investimento realizado com sucesso! Você pode visualizá-lo na sua Carteira.",
+      });
+      setShowModalResultado(true);
       setShowModalInvestir(false);
-      router.push("/marketplace");
 
+      // Redireciona após 3 segundos
+      setTimeout(() => {
+        router.push("/carteira");
+      }, 3000);
     } catch (err: any) {
       console.error("Erro ao investir:", err);
-      alert("Erro ao realizar investimento.");
+      const mensagemErro =
+        err?.response?.data?.message ||
+        err?.response?.data ||
+        "Erro ao realizar investimento. Tente novamente.";
+      setResultadoInvestimento({
+        sucesso: false,
+        mensagem: mensagemErro,
+      });
+      setShowModalResultado(true);
+      setShowModalInvestir(false);
     }
   };
-
 
   useEffect(() => {
     const idLocal = localStorage.getItem("userId");
@@ -154,6 +198,11 @@ export default function DetalhesInvestimentoPage() {
   const [erroMinimo, setErroMinimo] = useState("");
   const [tentouConfirmar, setTentouConfirmar] = useState(false);
   const [showModalInvestir, setShowModalInvestir] = useState(false);
+  const [showModalResultado, setShowModalResultado] = useState(false);
+  const [resultadoInvestimento, setResultadoInvestimento] = useState<{
+    sucesso: boolean;
+    mensagem: string;
+  } | null>(null);
 
   // ============================================
   // 5. BUSCAR DADOS (useEffect)
@@ -171,7 +220,9 @@ export default function DetalhesInvestimentoPage() {
           fullDescription: dados.descricaoUsoRecurso || dados.descricaoNegocio,
           totalValue: dados.valorSolicitado,
           currentValue: dados.saldoInvestido,
-          progress: Math.floor((dados.saldoInvestido / dados.valorSolicitado) * 100),
+          progress: Math.floor(
+            (dados.saldoInvestido / dados.valorSolicitado) * 100
+          ),
           interestRate: dados.taxaJuros,
           duration: dados.prazoMeses,
           minInvestment: 100,
@@ -203,7 +254,6 @@ export default function DetalhesInvestimentoPage() {
 
     carregarDetalhes();
   }, [id]);
-
 
   // ============================================
   // 6. SIMULADOR DE RENDIMENTO
@@ -430,9 +480,10 @@ export default function DetalhesInvestimentoPage() {
                 />
                 <InfoItem
                   label="Tempo de Mercado"
-                  value={`${new Date().getFullYear() -
+                  value={`${
+                    new Date().getFullYear() -
                     investimento.businessInfo.foundedYear
-                    } anos`}
+                  } anos`}
                 />
                 <InfoItem label="Categoria" value={investimento.category} />
               </div>
@@ -536,14 +587,30 @@ export default function DetalhesInvestimentoPage() {
                           }
                         );
                         setValorSimulacao(formatado);
+
+                        // Valida valor mínimo
                         if (valorNumerico < investimento.minInvestment) {
                           setErroMinimo(
                             `O valor mínimo para investir é R$ ${investimento.minInvestment.toLocaleString(
-                              "pt-BR"
+                              "pt-BR",
+                              { minimumFractionDigits: 2 }
                             )}`
                           );
-                        } else {
-                          setErroMinimo("");
+                        }
+                        // Valida valor máximo disponível
+                        else {
+                          const saldoDisponivel =
+                            investimento.totalValue - investimento.currentValue;
+                          if (valorNumerico > saldoDisponivel) {
+                            setErroMinimo(
+                              `O valor máximo disponível é R$ ${saldoDisponivel.toLocaleString(
+                                "pt-BR",
+                                { minimumFractionDigits: 2 }
+                              )}`
+                            );
+                          } else {
+                            setErroMinimo("");
+                          }
                         }
                       }}
                       className="w-full pl-12 pr-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent font-semibold text-gray-800 bg-slate-100"
@@ -553,10 +620,18 @@ export default function DetalhesInvestimentoPage() {
                   {erroMinimo ? (
                     <p className="text-xs text-red-500 mt-1">{erroMinimo}</p>
                   ) : (
-                    <p className="text-xs text-gray-500 mt-1">
-                      Mínimo: R${" "}
-                      {investimento.minInvestment.toLocaleString("pt-BR")}
-                    </p>
+                    <div className="flex justify-between text-xs text-gray-500 mt-1">
+                      <span>
+                        Mínimo: R${" "}
+                        {investimento.minInvestment.toLocaleString("pt-BR")}
+                      </span>
+                      <span>
+                        Disponível: R${" "}
+                        {(
+                          investimento.totalValue - investimento.currentValue
+                        ).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                      </span>
+                    </div>
                   )}
                 </div>
 
@@ -640,11 +715,12 @@ export default function DetalhesInvestimentoPage() {
                 </button>
                 <button
                   onClick={realizarInvestimento}
-                  className={`flex-1 bg-violet-600 hover:bg-violet-700 text-white py-3 rounded-lg font-semibold shadow-lg transition ${!valorSimulacao ||
+                  className={`flex-1 bg-violet-600 hover:bg-violet-700 text-white py-3 rounded-lg font-semibold shadow-lg transition ${
+                    !valorSimulacao ||
                     parseBRL(valorSimulacao) < investimento.minInvestment
-                    ? "opacity-50"
-                    : ""
-                    }`}
+                      ? "opacity-50"
+                      : ""
+                  }`}
                 >
                   Confirmar
                 </button>
@@ -654,6 +730,94 @@ export default function DetalhesInvestimentoPage() {
                   </p>
                 )}
               </div>
+            </div>
+          </div>
+          <style jsx>{`
+            @keyframes fade-in {
+              from {
+                opacity: 0;
+              }
+              to {
+                opacity: 1;
+              }
+            }
+            @keyframes scale-in {
+              from {
+                opacity: 0;
+                transform: scale(0.95);
+              }
+              to {
+                opacity: 1;
+                transform: scale(1);
+              }
+            }
+            .animate-fade-in {
+              animation: fade-in 0.2s ease;
+            }
+            .animate-scale-in {
+              animation: scale-in 0.25s cubic-bezier(0.4, 2, 0.6, 1);
+            }
+          `}</style>
+        </div>
+      )}
+
+      {/* Modal de Resultado */}
+      {showModalResultado && resultadoInvestimento && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 animate-fade-in">
+          <div className="bg-white rounded-3xl shadow-2xl p-0 max-w-md w-full overflow-hidden animate-scale-in">
+            <div
+              className={`${
+                resultadoInvestimento.sucesso
+                  ? "bg-gradient-to-r from-green-600 to-emerald-600"
+                  : "bg-gradient-to-r from-red-600 to-rose-600"
+              } p-6 text-white flex items-center gap-3`}
+            >
+              {resultadoInvestimento.sucesso ? (
+                <CheckCircle className="w-8 h-8" />
+              ) : (
+                <AlertCircle className="w-8 h-8" />
+              )}
+              <div>
+                <h3 className="text-2xl font-bold leading-tight">
+                  {resultadoInvestimento.sucesso ? "Sucesso!" : "Ops!"}
+                </h3>
+                <p className="text-sm opacity-80">
+                  {resultadoInvestimento.sucesso
+                    ? "Investimento confirmado"
+                    : "Não foi possível processar"}
+                </p>
+              </div>
+            </div>
+            <div className="p-8 text-center">
+              <p className="text-gray-700 text-lg mb-6">
+                {resultadoInvestimento.mensagem}
+              </p>
+              {resultadoInvestimento.sucesso ? (
+                <div className="flex flex-col gap-3">
+                  <button
+                    onClick={() => router.push("/carteira")}
+                    className="w-full py-3 bg-violet-600 text-white font-semibold rounded-xl hover:bg-violet-700 transition"
+                  >
+                    Ir para Carteira
+                  </button>
+                  <button
+                    onClick={() => router.push("/marketplace")}
+                    className="w-full py-3 border-2 border-gray-300 text-gray-700 font-semibold rounded-xl hover:bg-gray-50 transition"
+                  >
+                    Voltar ao Marketplace
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => {
+                    setShowModalResultado(false);
+                    setShowModalInvestir(true);
+                  }}
+                  className="w-full py-3 bg-violet-600 text-white font-semibold rounded-xl hover:bg-violet-700 transition"
+                >
+                  Tentar Novamente
+                </button>
+              )}
             </div>
           </div>
           <style jsx>{`
@@ -710,8 +874,9 @@ function MetricCard({ icon: Icon, label, value, color }: MetricCardProps) {
 
   return (
     <div
-      className={`rounded-xl p-4 border-2 ${colorClasses[color] || colorClasses.violet
-        }`}
+      className={`rounded-xl p-4 border-2 ${
+        colorClasses[color] || colorClasses.violet
+      }`}
     >
       <Icon className="w-5 h-5 mb-2" />
       <p className="text-xs font-semibold mb-1 opacity-80">{label}</p>
@@ -745,20 +910,23 @@ interface SimulacaoItemProps {
 function SimulacaoItem({ label, value, highlight }: SimulacaoItemProps) {
   return (
     <div
-      className={`flex items-center justify-between py-2 ${highlight ? "border-t-2 border-gray-200 pt-3" : ""
-        }`}
+      className={`flex items-center justify-between py-2 ${
+        highlight ? "border-t-2 border-gray-200 pt-3" : ""
+      }`}
     >
       <span
-        className={`text-sm ${highlight ? "font-bold text-gray-900" : "text-gray-600"
-          }`}
+        className={`text-sm ${
+          highlight ? "font-bold text-gray-900" : "text-gray-600"
+        }`}
       >
         {label}
       </span>
       <span
-        className={`${highlight
-          ? "text-lg font-bold text-green-600"
-          : "font-semibold text-gray-900"
-          }`}
+        className={`${
+          highlight
+            ? "text-lg font-bold text-green-600"
+            : "font-semibold text-gray-900"
+        }`}
       >
         {value}
       </span>
