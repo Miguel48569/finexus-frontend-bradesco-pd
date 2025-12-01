@@ -1,6 +1,3 @@
-// ============================================
-// marketplace/[id]/page.tsx - DETALHES DO INVESTIMENTO
-// ============================================
 "use client";
 
 import { useState, useEffect, ChangeEvent } from "react";
@@ -10,7 +7,7 @@ import {
   PropostaRequest,
   PropostaResponse,
 } from "@/services/proposta";
-import { investimentoService } from "@/services/investimento";
+import { investimentoService, InvestimentoResponse } from "@/services/investimento";
 import { useParams, useRouter } from "next/navigation";
 import {
   ArrowLeft,
@@ -101,15 +98,28 @@ export default function DetalhesInvestimentoPage() {
   );
   const [loading, setLoading] = useState(true);
   const [userId, setUserId] = useState<number | null>(null);
+  const [valorSimulacao, setValorSimulacao] = useState("");
+  const [erroMinimo, setErroMinimo] = useState("");
+  const [tentouConfirmar, setTentouConfirmar] = useState(false);
+  const [showModalInvestir, setShowModalInvestir] = useState(false);
+  const [showModalResultado, setShowModalResultado] = useState(false);
+  const [resultadoInvestimento, setResultadoInvestimento] = useState<{
+    sucesso: boolean;
+    mensagem: string;
+  } | null>(null);
+  
+  // 🆕 NOVO: Estado para armazenar o investimento criado
+  const [investimentoCriado, setInvestimentoCriado] = useState<InvestimentoResponse | null>(null);
+  const [criandoInvestimento, setCriandoInvestimento] = useState(false);
 
-  const realizarInvestimento = async () => {
+  // 🆕 NOVA FUNÇÃO: Criar investimento (chamada pelo botão "Investir Agora")
+  const criarInvestimento = async () => {
     if (!userId) {
       setResultadoInvestimento({
         sucesso: false,
         mensagem: "Usuário não identificado. Faça login novamente.",
       });
       setShowModalResultado(true);
-      setShowModalInvestir(false);
       return;
     }
 
@@ -119,7 +129,6 @@ export default function DetalhesInvestimentoPage() {
         mensagem: "Proposta não encontrada.",
       });
       setShowModalResultado(true);
-      setShowModalInvestir(false);
       return;
     }
 
@@ -149,20 +158,61 @@ export default function DetalhesInvestimentoPage() {
     }
 
     try {
+      setCriandoInvestimento(true);
+      
       const payload = {
         idInvestidor: userId,
         idProposta: Number(investimento.id),
         valor: valor,
       };
 
-      console.log("📤 Enviando investimento:", payload);
+      console.log("📤 Criando investimento:", payload);
 
-      await investimentoService.criar(payload);
+      // Cria o investimento e armazena a resposta
+      const response = await investimentoService.criar(payload);
+      
+      console.log("✅ Investimento criado:", response);
+      
+      setInvestimentoCriado(response);
+      setShowModalInvestir(true); // Abre o modal com os dados do investimento
+      
+    } catch (err: any) {
+      console.error("Erro ao criar investimento:", err);
+      const mensagemErro =
+        err?.response?.data?.message ||
+        err?.response?.data ||
+        "Erro ao criar investimento. Tente novamente.";
+      setResultadoInvestimento({
+        sucesso: false,
+        mensagem: mensagemErro,
+      });
+      setShowModalResultado(true);
+    } finally {
+      setCriandoInvestimento(false);
+    }
+  };
+
+  // 🔄 FUNÇÃO MODIFICADA: Confirmar investimento (chamada pelo botão "Confirmar" no modal)
+  const confirmarInvestimento = async () => {
+    if (!investimentoCriado) {
+      setResultadoInvestimento({
+        sucesso: false,
+        mensagem: "Nenhum investimento foi criado ainda.",
+      });
+      setShowModalResultado(true);
+      setShowModalInvestir(false);
+      return;
+    }
+
+    try {
+      console.log("📤 Confirmando investimento ID:", investimentoCriado.id);
+
+      await investimentoService.confirmar(investimentoCriado.id);
 
       setResultadoInvestimento({
         sucesso: true,
         mensagem:
-          "Investimento realizado com sucesso! Você pode visualizá-lo na sua Carteira.",
+          "Investimento confirmado com sucesso! Você pode visualizá-lo na sua Carteira.",
       });
       setShowModalResultado(true);
       setShowModalInvestir(false);
@@ -172,11 +222,11 @@ export default function DetalhesInvestimentoPage() {
         router.push("/carteira");
       }, 3000);
     } catch (err: any) {
-      console.error("Erro ao investir:", err);
+      console.error("Erro ao confirmar investimento:", err);
       const mensagemErro =
         err?.response?.data?.message ||
         err?.response?.data ||
-        "Erro ao realizar investimento. Tente novamente.";
+        "Erro ao confirmar investimento. Tente novamente.";
       setResultadoInvestimento({
         sucesso: false,
         mensagem: mensagemErro,
@@ -194,15 +244,6 @@ export default function DetalhesInvestimentoPage() {
       setUserId(Number(idLocal));
     }
   }, []);
-  const [valorSimulacao, setValorSimulacao] = useState("");
-  const [erroMinimo, setErroMinimo] = useState("");
-  const [tentouConfirmar, setTentouConfirmar] = useState(false);
-  const [showModalInvestir, setShowModalInvestir] = useState(false);
-  const [showModalResultado, setShowModalResultado] = useState(false);
-  const [resultadoInvestimento, setResultadoInvestimento] = useState<{
-    sucesso: boolean;
-    mensagem: string;
-  } | null>(null);
 
   // ============================================
   // 5. BUSCAR DADOS (useEffect)
@@ -273,17 +314,17 @@ export default function DetalhesInvestimentoPage() {
   const calcularRendimento = () => {
     if (!investimento) return { total: 0, lucro: 0 };
 
-    const meses = investimento.duration;
-    const taxaMensal = investimento.interestRate / 100;
     const valor = parseBRL(valorSimulacao);
 
     if (!valorSimulacao || valor < investimento.minInvestment) {
       return { total: 0, lucro: 0 };
     }
 
-    // Juros compostos: M = C * (1 + i)^t
-    const montante = valor * Math.pow(1 + taxaMensal, meses);
-    const lucro = montante - valor;
+    // A taxaJuros do backend é a taxa TOTAL do período (não mensal)
+    // Exemplo: 8.42% significa 8.42% de lucro sobre todo o período
+    const taxaTotal = investimento.interestRate / 100;
+    const lucro = valor * taxaTotal;
+    const montante = valor + lucro;
 
     return {
       total: montante,
@@ -333,128 +374,145 @@ export default function DetalhesInvestimentoPage() {
   }
 
   // ============================================
-  // 9. RENDER PRINCIPAL
+  // 9. COMPONENTES AUXILIARES
+  // ============================================
+  const SimulacaoItem = ({
+    label,
+    value,
+    highlight = false,
+  }: {
+    label: string;
+    value: string;
+    highlight?: boolean;
+  }) => (
+    <div
+      className={`flex justify-between items-center ${
+        highlight ? "font-bold" : ""
+      }`}
+    >
+      <span className="text-gray-600">{label}</span>
+      <span className={highlight ? "text-green-600" : "text-gray-900"}>
+        {value}
+      </span>
+    </div>
+  );
+
+  // ============================================
+  // 10. RENDER PRINCIPAL
   // ============================================
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-violet-50 to-purple-50 p-4 md:p-8">
-      <div className="max-w-7xl mx-auto">
-        {/* Breadcrumb / Botão Voltar */}
-        <button
-          onClick={() => router.push("/marketplace")}
-          className="flex items-center gap-2 text-violet-600 hover:text-violet-800 mb-6 font-medium transition group"
-        >
-          <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
-          Voltar para Marketplace
-        </button>
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-violet-50 to-purple-50">
+      {/* Header */}
+      <div className="bg-white border-b border-gray-200 sticky top-0 z-40 shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <button
+            onClick={() => router.push("/marketplace")}
+            className="flex items-center gap-2 text-violet-600 hover:text-violet-700 font-semibold transition group"
+          >
+            <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
+            Voltar para Marketplace
+          </button>
+        </div>
+      </div>
 
-        {/* Layout de 2 Colunas - RESPONSIVO */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
-          {/* COLUNA ESQUERDA - Informações Principais */}
+      {/* Conteúdo Principal */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* COLUNA ESQUERDA - Detalhes */}
           <div className="lg:col-span-2 space-y-6">
             {/* Card Principal */}
-            <div className="bg-white rounded-2xl shadow-lg p-6 md:p-8">
-              {/* Header com Tags */}
-              <div className="flex flex-wrap items-center gap-2 mb-4">
-                <span
-                  className={`px-3 py-1 rounded-lg text-xs font-bold ${getCategoryColor(
-                    investimento.category
-                  )}`}
-                >
-                  {investimento.category}
-                </span>
-                <span
-                  className={`px-3 py-1 rounded-lg text-xs font-bold border-2 ${getRiskColor(
+            <div className="bg-white rounded-2xl shadow-lg p-8">
+              {/* Cabeçalho */}
+              <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
+                <div>
+                  <div className="flex items-center gap-3 mb-2">
+                    <span
+                      className={`px-3 py-1 rounded-full text-xs font-semibold ${getCategoryColor(
+                        investimento.category
+                      )}`}
+                    >
+                      {investimento.category}
+                    </span>
+                    <span className="px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-700">
+                      {investimento.type}
+                    </span>
+                  </div>
+                  <h1 className="text-3xl font-bold text-gray-900 mb-2">
+                    {investimento.businessName}
+                  </h1>
+                  <p className="text-gray-600">{investimento.description}</p>
+                </div>
+                <div
+                  className={`px-4 py-2 rounded-xl border-2 ${getRiskColor(
                     investimento.risk
                   )}`}
                 >
-                  <Shield className="w-3 h-3 inline mr-1" />
-                  Risco {investimento.risk}
-                </span>
-                <span className="px-3 py-1 rounded-lg text-xs font-bold bg-gray-100 text-gray-700">
-                  {investimento.type}
-                </span>
+                  <p className="text-xs font-semibold">Risco</p>
+                  <p className="text-sm font-bold">{investimento.risk}</p>
+                </div>
               </div>
 
-              {/* Título */}
-              <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">
-                {investimento.businessName}
-              </h1>
-              <p className="text-gray-600 mb-1">
-                <span className="font-semibold">Proprietário:</span>{" "}
-                {investimento.meiName}
-              </p>
-              <p className="text-sm text-gray-500 mb-6">
-                CNPJ: {investimento.businessInfo.cnpj} • Fundada em{" "}
-                {investimento.businessInfo.foundedYear}
-              </p>
-
-              {/* Métricas Principais */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                <MetricCard
-                  icon={Target}
-                  label="Meta Total"
-                  value={`R$ ${(investimento.totalValue / 1000).toFixed(0)}k`}
-                  color="violet"
-                />
-                <MetricCard
-                  icon={TrendingUp}
-                  label="Retorno"
-                  value={`${investimento.interestRate}% a.m.`}
-                  color="green"
-                />
-                <MetricCard
-                  icon={Clock}
-                  label="Prazo"
-                  value={`${investimento.duration} meses`}
-                  color="blue"
-                />
-                <MetricCard
-                  icon={Users}
-                  label="Investidores"
-                  value={investimento.investors.toString()}
-                  color="purple"
-                />
-              </div>
-
-              {/* Barra de Progresso */}
-              <div className="bg-gray-50 rounded-xl p-4 mb-6">
-                <div className="flex items-center justify-between mb-3">
+              {/* Progresso */}
+              <div className="mb-6">
+                <div className="flex justify-between items-center mb-2">
                   <span className="text-sm font-semibold text-gray-700">
-                    Progresso do Financiamento
+                    Progresso do Investimento
                   </span>
-                  <span className="text-lg font-bold text-violet-600">
+                  <span className="text-sm font-bold text-violet-600">
                     {investimento.progress}%
                   </span>
                 </div>
-                <div className="w-full h-4 bg-gray-200 rounded-full overflow-hidden mb-3">
+                <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
                   <div
-                    className="h-full bg-gradient-to-r from-violet-500 to-purple-500 transition-all duration-500 rounded-full"
+                    className="bg-gradient-to-r from-violet-500 to-purple-500 h-full rounded-full transition-all duration-500"
                     style={{ width: `${investimento.progress}%` }}
                   />
                 </div>
-                <div className="flex items-center justify-between text-sm text-gray-600">
-                  <span className="font-semibold">
-                    R$ {investimento.currentValue.toLocaleString("pt-BR")}
+                <div className="flex justify-between items-center mt-2 text-sm">
+                  <span className="text-gray-600">
+                    R${" "}
+                    {investimento.currentValue.toLocaleString("pt-BR", {
+                      minimumFractionDigits: 2,
+                    })}
                   </span>
-                  <span>
-                    Faltam R${" "}
-                    {(
-                      investimento.totalValue - investimento.currentValue
-                    ).toLocaleString("pt-BR")}
-                  </span>
-                </div>
-                <div className="mt-3 flex items-center gap-2 text-sm">
-                  <Clock className="w-4 h-4 text-orange-500" />
-                  <span className="font-semibold text-orange-600">
-                    {investimento.daysLeft} dias restantes
+                  <span className="font-semibold text-gray-900">
+                    R${" "}
+                    {investimento.totalValue.toLocaleString("pt-BR", {
+                      minimumFractionDigits: 2,
+                    })}
                   </span>
                 </div>
               </div>
 
+              {/* Métricas */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                <MetricCard
+                  icon={<TrendingUp className="w-5 h-5 text-green-600" />}
+                  label="Taxa de Retorno"
+                  value={`${investimento.interestRate}% a.m.`}
+                />
+                <MetricCard
+                  icon={<Clock className="w-5 h-5 text-blue-600" />}
+                  label="Prazo"
+                  value={`${investimento.duration} meses`}
+                />
+                <MetricCard
+                  icon={<Users className="w-5 h-5 text-purple-600" />}
+                  label="Investidores"
+                  value={investimento.investors.toString()}
+                />
+                <MetricCard
+                  icon={<Target className="w-5 h-5 text-orange-600" />}
+                  label="Dias Restantes"
+                  value={investimento.daysLeft.toString()}
+                />
+              </div>
+
               {/* Descrição Completa */}
-              <div>
-                <h2 className="text-xl font-bold text-gray-900 mb-3">
-                  Sobre o Projeto
+              <div className="border-t border-gray-200 pt-6">
+                <h2 className="text-xl font-bold text-gray-900 mb-3 flex items-center gap-2">
+                  <FileText className="w-5 h-5 text-violet-600" />
+                  Sobre o Negócio
                 </h2>
                 <p className="text-gray-700 leading-relaxed">
                   {investimento.fullDescription}
@@ -463,14 +521,20 @@ export default function DetalhesInvestimentoPage() {
             </div>
 
             {/* Informações do Negócio */}
-            <div className="bg-white rounded-2xl shadow-lg p-6 md:p-8">
-              <h2 className="text-xl font-bold text-gray-900 mb-4">
+            <div className="bg-white rounded-2xl shadow-lg p-6">
+              <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                <Shield className="w-5 h-5 text-violet-600" />
                 Informações do Negócio
-              </h2>
+              </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <InfoItem label="CNPJ" value={investimento.businessInfo.cnpj} />
+                <InfoItem
+                  label="Ano de Fundação"
+                  value={investimento.businessInfo.foundedYear.toString()}
+                />
                 <InfoItem
                   label="Funcionários"
-                  value={`${investimento.businessInfo.employees} colaboradores`}
+                  value={investimento.businessInfo.employees.toString()}
                 />
                 <InfoItem
                   label="Faturamento Mensal"
@@ -478,23 +542,15 @@ export default function DetalhesInvestimentoPage() {
                     "pt-BR"
                   )}`}
                 />
-                <InfoItem
-                  label="Tempo de Mercado"
-                  value={`${
-                    new Date().getFullYear() -
-                    investimento.businessInfo.foundedYear
-                  } anos`}
-                />
-                <InfoItem label="Categoria" value={investimento.category} />
               </div>
             </div>
 
             {/* Documentos */}
-            <div className="bg-white rounded-2xl shadow-lg p-6 md:p-8">
-              <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-                <FileText className="w-6 h-6 text-violet-600" />
+            <div className="bg-white rounded-2xl shadow-lg p-6">
+              <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                <FileText className="w-5 h-5 text-violet-600" />
                 Documentos Disponíveis
-              </h2>
+              </h3>
               <div className="space-y-3">
                 {investimento.documents.map((doc, index) => (
                   <div
@@ -538,11 +594,13 @@ export default function DetalhesInvestimentoPage() {
                   </p>
                 </div>
 
+                {/* 🔄 BOTÃO MODIFICADO: Agora chama criarInvestimento */}
                 <button
-                  onClick={() => setShowModalInvestir(true)}
-                  className="w-full bg-gradient-to-r from-violet-500 to-purple-500 hover:from-violet-600 hover:to-purple-600 text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:shadow-xl transition-all transform hover:scale-105 mb-3"
+                  onClick={criarInvestimento}
+                  disabled={criandoInvestimento || !valorSimulacao || parseBRL(valorSimulacao) < investimento.minInvestment}
+                  className="w-full bg-gradient-to-r from-violet-500 to-purple-500 hover:from-violet-600 hover:to-purple-600 text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:shadow-xl transition-all transform hover:scale-105 mb-3 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
                 >
-                  Investir Agora
+                  {criandoInvestimento ? "Criando..." : "Investir Agora"}
                 </button>
 
                 <div className="flex items-center justify-center gap-2 text-sm text-gray-600">
@@ -672,63 +730,93 @@ export default function DetalhesInvestimentoPage() {
         </div>
       </div>
 
-      {/* Modal Investir (Placeholder) */}
-      {showModalInvestir && (
+      {/* 🔄 MODAL MODIFICADO: Agora exibe dados do investimento criado e botão confirma o pagamento */}
+      {showModalInvestir && investimentoCriado && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 animate-fade-in">
           <div className="bg-white rounded-3xl shadow-2xl p-0 max-w-md w-full overflow-hidden animate-scale-in">
             <div className="bg-gradient-to-r from-violet-600 to-purple-600 p-6 text-white flex items-center gap-3">
               <DollarSign className="w-8 h-8" />
               <div>
                 <h3 className="text-2xl font-bold leading-tight">
-                  Confirmar Investimento
+                  Confirmar Pagamento
                 </h3>
                 <p className="text-sm opacity-80">
-                  Revise os dados antes de confirmar
+                  Investimento criado com sucesso
                 </p>
               </div>
             </div>
             <div className="p-8">
               <p className="text-gray-700 mb-4 text-lg font-semibold text-center">
-                Você está prestes a investir em{" "}
+                Seu investimento em{" "}
                 <span className="text-violet-700">
                   {investimento.businessName}
-                </span>
+                </span>{" "}
+                foi criado!
               </p>
-              <div className="bg-gray-50 rounded-xl p-4 mb-6 flex flex-col gap-2 text-center">
-                <span className="text-gray-500 text-sm">
-                  Valor do Investimento
-                </span>
-                <span className="text-2xl font-bold text-violet-700">
-                  R$ {valorSimulacao || "0,00"}
-                </span>
-                <span className="text-gray-500 text-sm">Taxa Mensal</span>
-                <span className="font-semibold text-green-600">
-                  {investimento.interestRate}% a.m.
-                </span>
+              
+              <div className="bg-gray-50 rounded-xl p-4 mb-6 flex flex-col gap-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-500 text-sm">ID do Investimento</span>
+                  <span className="font-semibold text-gray-900">#{investimentoCriado.id}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-500 text-sm">Valor Investido</span>
+                  <span className="text-2xl font-bold text-violet-700">
+                    R$ {investimentoCriado.valorInvestido.toLocaleString("pt-BR", {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-500 text-sm">Rendimento Esperado</span>
+                  <span className="font-semibold text-green-600">
+                    R$ {investimentoCriado.rendimentoEsperado.toLocaleString("pt-BR", {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-500 text-sm">Status</span>
+                  <span className="px-2 py-1 bg-amber-100 text-amber-700 rounded-full text-xs font-semibold">
+                    {investimentoCriado.status}
+                  </span>
+                </div>
               </div>
+
+              {/* Exibe QR Code se disponível */}
+              {investimentoCriado.qrCodeUrl && (
+                <div className="bg-white border-2 border-gray-200 rounded-xl p-4 mb-6 text-center">
+                  <p className="text-sm text-gray-600 mb-3">Pague com PIX</p>
+                  <img 
+                    src={investimentoCriado.qrCodeUrl} 
+                    alt="QR Code PIX" 
+                    className="w-48 h-48 mx-auto"
+                  />
+                </div>
+              )}
+
+              <p className="text-sm text-gray-600 text-center mb-6">
+                Clique em "Confirmar Pagamento" após realizar o pagamento para finalizar o investimento.
+              </p>
+
               <div className="flex gap-3 mt-6">
                 <button
-                  onClick={() => setShowModalInvestir(false)}
+                  onClick={() => {
+                    setShowModalInvestir(false);
+                    setInvestimentoCriado(null);
+                  }}
                   className="flex-1 border-2 border-gray-300 text-gray-700 py-3 rounded-lg font-semibold hover:bg-gray-50 transition"
                 >
                   Cancelar
                 </button>
                 <button
-                  onClick={realizarInvestimento}
-                  className={`flex-1 bg-violet-600 hover:bg-violet-700 text-white py-3 rounded-lg font-semibold shadow-lg transition ${
-                    !valorSimulacao ||
-                    parseBRL(valorSimulacao) < investimento.minInvestment
-                      ? "opacity-50"
-                      : ""
-                  }`}
+                  onClick={confirmarInvestimento}
+                  className="flex-1 bg-violet-600 hover:bg-violet-700 text-white py-3 rounded-lg font-semibold shadow-lg transition"
                 >
-                  Confirmar
+                  Confirmar Pagamento
                 </button>
-                {tentouConfirmar && erroMinimo && (
-                  <p className="w-full text-center text-xs text-red-500 mt-2">
-                    {erroMinimo}
-                  </p>
-                )}
               </div>
             </div>
           </div>
@@ -811,7 +899,8 @@ export default function DetalhesInvestimentoPage() {
                 <button
                   onClick={() => {
                     setShowModalResultado(false);
-                    setShowModalInvestir(true);
+                    setShowModalInvestir(false);
+                    setInvestimentoCriado(null);
                   }}
                   className="w-full py-3 bg-violet-600 text-white font-semibold rounded-xl hover:bg-violet-700 transition"
                 >
@@ -853,83 +942,27 @@ export default function DetalhesInvestimentoPage() {
 }
 
 // ============================================
-// 10. COMPONENTES AUXILIARES
+// COMPONENTES AUXILIARES
 // ============================================
-
-// Card de Métrica
-interface MetricCardProps {
-  icon: React.ElementType;
+const MetricCard = ({
+  icon,
+  label,
+  value,
+}: {
+  icon: React.ReactNode;
   label: string;
   value: string;
-  color: string;
-}
+}) => (
+  <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-4 border border-gray-200">
+    <div className="flex items-center gap-2 mb-2">{icon}</div>
+    <p className="text-xs text-gray-600 mb-1">{label}</p>
+    <p className="text-lg font-bold text-gray-900">{value}</p>
+  </div>
+);
 
-function MetricCard({ icon: Icon, label, value, color }: MetricCardProps) {
-  const colorClasses: Record<string, string> = {
-    violet: "bg-violet-50 border-violet-200 text-violet-700",
-    green: "bg-green-50 border-green-200 text-green-700",
-    blue: "bg-blue-50 border-blue-200 text-blue-700",
-    purple: "bg-purple-50 border-purple-200 text-purple-700",
-  };
-
-  return (
-    <div
-      className={`rounded-xl p-4 border-2 ${
-        colorClasses[color] || colorClasses.violet
-      }`}
-    >
-      <Icon className="w-5 h-5 mb-2" />
-      <p className="text-xs font-semibold mb-1 opacity-80">{label}</p>
-      <p className="text-lg font-bold">{value}</p>
-    </div>
-  );
-}
-
-// Item de Informação
-interface InfoItemProps {
-  label: string;
-  value: string;
-}
-
-function InfoItem({ label, value }: InfoItemProps) {
-  return (
-    <div className="bg-gray-50 rounded-lg p-4">
-      <p className="text-sm text-gray-600 mb-1">{label}</p>
-      <p className="font-bold text-gray-900">{value}</p>
-    </div>
-  );
-}
-
-// Item de Simulação
-interface SimulacaoItemProps {
-  label: string;
-  value: string;
-  highlight?: boolean;
-}
-
-function SimulacaoItem({ label, value, highlight }: SimulacaoItemProps) {
-  return (
-    <div
-      className={`flex items-center justify-between py-2 ${
-        highlight ? "border-t-2 border-gray-200 pt-3" : ""
-      }`}
-    >
-      <span
-        className={`text-sm ${
-          highlight ? "font-bold text-gray-900" : "text-gray-600"
-        }`}
-      >
-        {label}
-      </span>
-      <span
-        className={`${
-          highlight
-            ? "text-lg font-bold text-green-600"
-            : "font-semibold text-gray-900"
-        }`}
-      >
-        {value}
-      </span>
-    </div>
-  );
-}
+const InfoItem = ({ label, value }: { label: string; value: string }) => (
+  <div className="bg-gray-50 rounded-lg p-4">
+    <p className="text-xs text-gray-600 mb-1">{label}</p>
+    <p className="text-sm font-semibold text-gray-900">{value}</p>
+  </div>
+);
