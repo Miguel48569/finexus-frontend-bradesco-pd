@@ -38,6 +38,7 @@ export interface InvestimentoResponse {
   proposta: {
     id: number;
     nomeNegocio?: string;
+    categoria?: string;
     valorSolicitado?: number;
     saldoInvestido?: number;
     taxaJuros?: number;

@@ -18,7 +18,7 @@ import {
   CheckCircle2,
   AlertCircle,
 } from "lucide-react";
-import { saldoService, SaldoResponse } from "@/services/saldo";
+import { saldoService } from "@/services/saldo";
 import { investimentoService } from "@/services/investimento";
 
 interface Investment {
@@ -37,12 +37,6 @@ interface Investment {
   status: "Ativo" | "Finalizado" | "Em Andamento";
 }
 
-interface AllocationItem {
-  category: string;
-  percentage: number;
-  color: string;
-}
-
 const MinhaCarteira = () => {
   const [saldoDisponivel, setSaldoDisponivel] = useState(0);
   const [portfolioTotal, setPortfolioTotal] = useState(0);
@@ -54,46 +48,76 @@ const MinhaCarteira = () => {
     texto: string;
   } | null>(null);
   const [investments, setInvestments] = useState<Investment[]>([]);
-  const [saldoExiste, setSaldoExiste] = useState(true); // Flag para saber se o saldo existe no backend
+
+  // Cálculos dinâmicos baseados nos investimentos reais
+  const totalInvestedValue = investments.reduce(
+    (acc, inv) => acc + inv.investedAmount,
+    0
+  );
+  const totalCurrentValue = investments.reduce(
+    (acc, inv) => acc + inv.currentValue,
+    0
+  );
+  const totalReturn =
+    totalInvestedValue > 0
+      ? ((totalCurrentValue - totalInvestedValue) / totalInvestedValue) * 100
+      : 0;
+  const activeInvestments = investments.filter(
+    (inv) => inv.status === "Ativo"
+  ).length;
+  const completedInvestments = investments.filter(
+    (inv) => inv.status === "Finalizado"
+  ).length;
 
   const portfolioData = {
     totalEquity: portfolioTotal,
-    totalReturn: 57.8,
-    monthlyReturn: 4.2,
-    monthlyDividends: 892.5,
-    investedValue: 50000,
-    investedChange: 12.5,
-    volatility: 8.2,
-    volatilityChange: 1.3,
-    sharpeRatio: 1.85,
-    sharpeChange: 0.15,
-    diversification: "Alta",
-    diversificationClasses: 5,
-    activeInvestments: 8,
-    completedInvestments: 3,
+    totalReturn: totalReturn,
+    investedValue: totalInvestedValue,
+    currentValue: totalCurrentValue,
+    diversificationClasses: [...new Set(investments.map((inv) => inv.category))]
+      .length,
+    activeInvestments: activeInvestments,
+    completedInvestments: completedInvestments,
   };
 
-  const allocation: AllocationItem[] = [
-    { category: "Alimentação", percentage: 35, color: "#8b5cf6" },
-    { category: "Varejo", percentage: 25, color: "#a78bfa" },
-    { category: "Logística", percentage: 20, color: "#c4b5fd" },
-    { category: "Beleza", percentage: 15, color: "#ddd6fe" },
-    { category: "Outros", percentage: 5, color: "#ede9fe" },
-  ];
+  // Cálculo dinâmico de distribuição por categoria
+  // Cálculo de distribuição por categoria (não usado mais, mas pode ser útil no futuro)
+  // const calcularDistribuicaoPorCategoria = (): AllocationItem[] => { ... }
 
-  const performanceData = [
-    { month: "Jan", value: 50000 },
-    { month: "Fev", value: 51500 },
-    { month: "Mar", value: 51200 },
-    { month: "Abr", value: 53800 },
-    { month: "Mai", value: 56200 },
-    { month: "Jun", value: 59400 },
-    { month: "Jul", value: 62100 },
-    { month: "Ago", value: 65800 },
-    { month: "Set", value: 69500 },
-    { month: "Out", value: 73200 },
-    { month: "Nov", value: 78900 },
-  ];
+  // Gerar dados de evolução baseado nos investimentos reais
+  const performanceData = (() => {
+    if (investments.length === 0) {
+      return [
+        { month: "Jan", value: 0 },
+        { month: "Fev", value: 0 },
+        { month: "Mar", value: 0 },
+        { month: "Abr", value: 0 },
+        { month: "Mai", value: 0 },
+        { month: "Jun", value: 0 },
+        { month: "Jul", value: 0 },
+        { month: "Ago", value: 0 },
+        { month: "Set", value: 0 },
+        { month: "Out", value: 0 },
+        { month: "Nov", value: 0 },
+      ];
+    }
+
+    // Simula crescimento gradual até o valor atual
+    const incremento = totalCurrentValue / 11;
+    return [
+      { month: "Jan", value: incremento * 1 },
+      { month: "Fev", value: incremento * 2 },
+      { month: "Mar", value: incremento * 3 },
+      { month: "Abr", value: incremento * 4 },
+      { month: "Mai", value: incremento * 5 },
+      { month: "Jun", value: incremento * 6 },
+      { month: "Jul", value: incremento * 7 },
+      { month: "Ago", value: incremento * 8 },
+      { month: "Set", value: incremento * 9 },
+      { month: "Out", value: incremento * 10 },
+      { month: "Nov", value: totalCurrentValue },
+    ];
+  })();
 
   // Função auxiliar para obter ícone por categoria
   const getCategoryIcon = (category: string) => {
@@ -110,15 +134,6 @@ const MinhaCarteira = () => {
         return <Package className="w-5 h-5" />;
     }
   };
-
-  const totalInvestedValue = investments.reduce(
-    (acc, inv) => acc + inv.investedAmount,
-    0
-  );
-  const totalCurrentValue = investments.reduce(
-    (acc, inv) => acc + inv.currentValue,
-    0
-  );
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -169,38 +184,21 @@ const MinhaCarteira = () => {
         console.log("🔍 Carregando dados para userId:", userId);
 
         // Inicializa com valores padrão
-        let saldoValor = 0;
         let investimentosList: Investment[] = [];
+        let saldoValor = 0;
 
-        // Tenta carregar saldo
+        // Tenta carregar saldo do usuário
         try {
           const saldoData = await saldoService.buscarPorUsuario(Number(userId));
           console.log("✅ Saldo recebido:", saldoData);
           saldoValor = saldoData.valor || 0;
           setSaldoDisponivel(saldoValor);
-          setSaldoExiste(true); // Saldo existe no backend
         } catch (saldoError: any) {
           const statusCode = saldoError?.response?.status;
           console.warn(
             `⚠️ Saldo não encontrado (${statusCode}). Usando valor padrão 0.`
           );
-
-          // Se for 404, significa que o saldo não existe no backend
-          if (statusCode === 404) {
-            saldoValor = 0;
-            setSaldoDisponivel(0);
-            setSaldoExiste(false); // Marca que o saldo não existe
-            console.warn(
-              "⚠️ Saldo não cadastrado no backend. Resgate desabilitado."
-            );
-          } else {
-            console.error(
-              "❌ Erro ao carregar saldo:",
-              saldoError?.response?.data
-            );
-            setSaldoDisponivel(0);
-            setSaldoExiste(false);
-          }
+          setSaldoDisponivel(0);
         }
 
         // Tenta carregar investimentos
@@ -376,24 +374,6 @@ const MinhaCarteira = () => {
           </div>
         </div>
 
-        {/* Alerta quando saldo não existe */}
-        {!saldoExiste && (
-          <div className="bg-amber-50 border-2 border-amber-300 rounded-xl p-4 mb-6 flex items-start gap-3">
-            <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
-            <div>
-              <p className="font-semibold text-amber-900 mb-1">
-                Saldo não cadastrado no sistema
-              </p>
-              <p className="text-sm text-amber-700">
-                O registro de saldo não foi encontrado no backend. Isso pode
-                ocorrer se você ainda não realizou nenhuma transação. Entre em
-                contato com o suporte ou faça um investimento para inicializar
-                seu saldo.
-              </p>
-            </div>
-          </div>
-        )}
-
         {/* Mensagem de feedback temporária */}
         {mensagem && !modalResgateOpen && (
           <div
@@ -422,49 +402,42 @@ const MinhaCarteira = () => {
         <div className="bg-gradient-to-br from-violet-600 via-violet-500 to-purple-600 rounded-3xl p-8 mb-6 text-white shadow-2xl">
           <div className="flex justify-between items-center mb-6">
             <div>
-              <p className="text-violet-100 text-sm mb-2">Portfólio Total</p>
+              <p className="text-violet-100 text-sm mb-2">Saldo Disponível</p>
               <p className="text-5xl font-bold">
                 R${" "}
-                {portfolioTotal.toLocaleString("pt-BR", {
+                {saldoDisponivel.toLocaleString("pt-BR", {
                   minimumFractionDigits: 2,
                 })}
               </p>
               <p className="text-violet-200 text-sm mt-1">
-                Saldo disponível para movimentação
+                Total em movimentação: R${" "}
+                {portfolioTotal.toLocaleString("pt-BR", {
+                  minimumFractionDigits: 2,
+                })}
               </p>
             </div>
             <button
               onClick={() => {
-                if (!saldoExiste) {
-                  setMensagem({
-                    tipo: "erro",
-                    texto:
-                      "Saldo não disponível. O registro de saldo não foi encontrado no sistema.",
-                  });
-                  setTimeout(() => setMensagem(null), 3000);
-                  return;
-                }
                 if (saldoDisponivel <= 0) {
                   setMensagem({
                     tipo: "erro",
-                    texto: "Você não possui saldo disponível para resgate.",
+                    texto:
+                      "Investidores não possuem saldo para resgate. Investimentos são realizados via PIX/Boleto.",
                   });
                   setTimeout(() => setMensagem(null), 3000);
                   return;
                 }
                 setModalResgateOpen(true);
               }}
-              disabled={!saldoExiste || saldoDisponivel <= 0}
+              disabled={saldoDisponivel <= 0}
               className={`px-6 py-3 rounded-xl font-bold transition-all shadow-lg flex items-center gap-2 ${
-                !saldoExiste || saldoDisponivel <= 0
+                saldoDisponivel <= 0
                   ? "bg-gray-300 text-gray-500 cursor-not-allowed"
                   : "bg-white text-violet-600 hover:bg-violet-50 hover:scale-105"
               }`}
               title={
-                !saldoExiste
-                  ? "Saldo não cadastrado no sistema"
-                  : saldoDisponivel <= 0
-                  ? "Sem saldo disponível"
+                saldoDisponivel <= 0
+                  ? "Investidores não possuem saldo para resgate"
                   : "Resgatar saldo"
               }
             >
@@ -485,14 +458,30 @@ const MinhaCarteira = () => {
               <p className="text-violet-200 text-xs mt-1">Investido em MEIs</p>
             </div>
             <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20">
-              <p className="text-violet-100 text-sm mb-2">Empréstimos</p>
-              <p className="text-2xl font-bold">5</p>
-              <p className="text-violet-200 text-xs mt-1">Ativos</p>
+              <p className="text-violet-100 text-sm mb-2">Investimentos</p>
+              <p className="text-2xl font-bold">{investments.length}</p>
+              <p className="text-violet-200 text-xs mt-1">Total realizados</p>
             </div>
             <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20">
               <p className="text-violet-100 text-sm mb-2">Variação Total</p>
-              <p className="text-2xl font-bold">+37.8%</p>
-              <p className="text-violet-200 text-xs mt-1">58.00%</p>
+              <p className="text-2xl font-bold">
+                +
+                {totalInvestedValue > 0
+                  ? (
+                      ((totalCurrentValue - totalInvestedValue) /
+                        totalInvestedValue) *
+                      100
+                    ).toFixed(1)
+                  : 0}
+                %
+              </p>
+              <p className="text-violet-200 text-xs mt-1">
+                R${" "}
+                {(totalCurrentValue - totalInvestedValue).toLocaleString(
+                  "pt-BR",
+                  { minimumFractionDigits: 2 }
+                )}
+              </p>
             </div>
             <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20">
               <p className="text-violet-100 text-sm mb-2">Disponível</p>
@@ -537,11 +526,11 @@ const MinhaCarteira = () => {
             <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-4 border border-white/20">
               <p className="text-violet-100 text-sm mb-2 flex items-center gap-2">
                 <Activity className="w-4 h-4" />
-                Rentabilidade Mensal
+                Retorno Total
               </p>
               <div className="flex items-center gap-2">
                 <p className="text-3xl font-bold">
-                  +{portfolioData.monthlyReturn}%
+                  +{portfolioData.totalReturn.toFixed(1)}%
                 </p>
                 <TrendingUp className="w-6 h-6" />
               </div>
@@ -549,11 +538,13 @@ const MinhaCarteira = () => {
             <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-4 border border-white/20">
               <p className="text-violet-100 text-sm mb-2 flex items-center gap-2">
                 <DollarSign className="w-4 h-4" />
-                Retornos Este Mês
+                Lucro Atual
               </p>
               <p className="text-3xl font-bold">
                 R${" "}
-                {portfolioData.monthlyDividends.toLocaleString("pt-BR", {
+                {(
+                  portfolioData.currentValue - portfolioData.investedValue
+                ).toLocaleString("pt-BR", {
                   minimumFractionDigits: 2,
                 })}
               </p>
@@ -569,14 +560,16 @@ const MinhaCarteira = () => {
               <div className="bg-violet-100 p-3 rounded-xl">
                 <DollarSign className="w-6 h-6 text-violet-600" />
               </div>
-              <span className="text-green-600 text-sm font-semibold flex items-center gap-1 bg-green-50 px-3 py-1 rounded-full">
-                <TrendingUp className="w-4 h-4" />+
-                {portfolioData.investedChange}%
+              <span className="text-violet-600 text-sm font-semibold bg-violet-50 px-3 py-1 rounded-full">
+                Total
               </span>
             </div>
             <p className="text-gray-600 text-sm mb-1">Valor Investido</p>
             <p className="text-2xl font-bold text-gray-900">
-              R$ {portfolioData.investedValue.toLocaleString("pt-BR")}
+              R${" "}
+              {portfolioData.investedValue.toLocaleString("pt-BR", {
+                minimumFractionDigits: 2,
+              })}
             </p>
           </div>
 
@@ -586,29 +579,36 @@ const MinhaCarteira = () => {
               <div className="bg-purple-100 p-3 rounded-xl">
                 <Activity className="w-6 h-6 text-purple-600" />
               </div>
-              <span className="text-purple-600 text-sm font-semibold bg-purple-50 px-3 py-1 rounded-full">
-                Ativos
+              <span className="text-green-600 text-sm font-semibold bg-green-50 px-3 py-1 rounded-full">
+                {portfolioData.activeInvestments} ativos
               </span>
             </div>
-            <p className="text-gray-600 text-sm mb-1">Investimentos Ativos</p>
+            <p className="text-gray-600 text-sm mb-1">Retorno Atual</p>
             <p className="text-2xl font-bold text-gray-900">
-              {portfolioData.activeInvestments}
+              R${" "}
+              {(
+                portfolioData.currentValue - portfolioData.investedValue
+              ).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
             </p>
           </div>
 
-          {/* Sharpe Ratio */}
+          {/* Valor Total Atual */}
           <div className="bg-white rounded-2xl p-6 border border-indigo-100 shadow-lg hover:shadow-xl transition-all hover:scale-105">
             <div className="flex items-center justify-between mb-4">
               <div className="bg-indigo-100 p-3 rounded-xl">
-                <BarChart3 className="w-6 h-6 text-indigo-600" />
+                <TrendingUp className="w-6 h-6 text-indigo-600" />
               </div>
               <span className="text-green-600 text-sm font-semibold flex items-center gap-1 bg-green-50 px-3 py-1 rounded-full">
-                <TrendingUp className="w-4 h-4" />+{portfolioData.sharpeChange}
+                <TrendingUp className="w-4 h-4" />+
+                {portfolioData.totalReturn.toFixed(1)}%
               </span>
             </div>
-            <p className="text-gray-600 text-sm mb-1">Índice de Retorno</p>
+            <p className="text-gray-600 text-sm mb-1">Valor Total Atual</p>
             <p className="text-2xl font-bold text-gray-900">
-              {portfolioData.sharpeRatio}
+              R${" "}
+              {portfolioData.currentValue.toLocaleString("pt-BR", {
+                minimumFractionDigits: 2,
+              })}
             </p>
           </div>
 
@@ -618,200 +618,305 @@ const MinhaCarteira = () => {
               <div className="bg-pink-100 p-3 rounded-xl">
                 <PieChart className="w-6 h-6 text-pink-600" />
               </div>
-              <span className="text-green-600 text-sm font-semibold flex items-center gap-1 bg-green-50 px-3 py-1 rounded-full">
-                <TrendingUp className="w-4 h-4" />+
-                {portfolioData.diversificationClasses} setores
+              <span className="text-pink-600 text-sm font-semibold bg-pink-50 px-3 py-1 rounded-full">
+                {portfolioData.diversificationClasses}{" "}
+                {portfolioData.diversificationClasses === 1
+                  ? "setor"
+                  : "setores"}
               </span>
             </div>
             <p className="text-gray-600 text-sm mb-1">Diversificação</p>
             <p className="text-2xl font-bold text-gray-900">
-              {portfolioData.diversification}
+              {portfolioData.diversificationClasses === 0
+                ? "Nenhum"
+                : portfolioData.diversificationClasses >= 3
+                ? "Alta"
+                : "Baixa"}
             </p>
           </div>
         </div>
 
         {/* Charts Section */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
           {/* Performance Chart */}
-          <div className="lg:col-span-2 bg-white rounded-2xl p-6 border border-violet-100 shadow-lg">
-            <h3 className="text-lg font-bold text-gray-900 mb-6 flex items-center gap-2">
-              <TrendingUp className="w-5 h-5 text-violet-600" />
-              Evolução do Patrimônio
-            </h3>
-            <div className="relative h-64">
-              <svg
-                width="100%"
-                height="100%"
-                viewBox="0 0 800 250"
-                preserveAspectRatio="none"
-              >
-                {/* Grid lines */}
-                <line
-                  x1="0"
-                  y1="200"
-                  x2="800"
-                  y2="200"
-                  stroke="#e5e7eb"
-                  strokeWidth="1"
-                />
-                <line
-                  x1="0"
-                  y1="150"
-                  x2="800"
-                  y2="150"
-                  stroke="#e5e7eb"
-                  strokeWidth="1"
-                />
-                <line
-                  x1="0"
-                  y1="100"
-                  x2="800"
-                  y2="100"
-                  stroke="#e5e7eb"
-                  strokeWidth="1"
-                />
-                <line
-                  x1="0"
-                  y1="50"
-                  x2="800"
-                  y2="50"
-                  stroke="#e5e7eb"
-                  strokeWidth="1"
-                />
-
-                {/* Area fill */}
-                <defs>
-                  <linearGradient
-                    id="areaGradient"
-                    x1="0%"
-                    y1="0%"
-                    x2="0%"
-                    y2="100%"
-                  >
-                    <stop offset="0%" stopColor="#8b5cf6" stopOpacity="0.4" />
-                    <stop
-                      offset="100%"
-                      stopColor="#a78bfa"
-                      stopOpacity="0.05"
-                    />
-                  </linearGradient>
-                </defs>
-
-                <path
-                  d={`M 0 ${
-                    250 - performanceData[0].value / 800
-                  } ${performanceData
-                    .map(
-                      (d, i) =>
-                        `L ${(i * 800) / (performanceData.length - 1)} ${
-                          250 - d.value / 800
-                        }`
-                    )
-                    .join(" ")} L 800 250 L 0 250 Z`}
-                  fill="url(#areaGradient)"
-                />
-
-                {/* Line */}
-                <path
-                  d={`M 0 ${
-                    250 - performanceData[0].value / 800
-                  } ${performanceData
-                    .map(
-                      (d, i) =>
-                        `L ${(i * 800) / (performanceData.length - 1)} ${
-                          250 - d.value / 800
-                        }`
-                    )
-                    .join(" ")}`}
-                  fill="none"
-                  stroke="#8b5cf6"
-                  strokeWidth="3"
-                />
-              </svg>
-
-              {/* X-axis labels */}
-              <div className="flex justify-between text-xs text-gray-500 mt-2">
-                {performanceData.map((d) => (
-                  <span key={d.month}>{d.month}</span>
-                ))}
-              </div>
-
-              {/* Y-axis labels */}
-              <div className="absolute left-0 top-0 h-full flex flex-col justify-between text-xs text-gray-500 -ml-12">
-                <span>80k</span>
-                <span>60k</span>
-                <span>40k</span>
-                <span>20k</span>
-                <span>0</span>
+          <div className="lg:col-span-2 bg-white rounded-2xl p-6 border border-violet-100 shadow-xl shadow-violet-200/50">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                <TrendingUp className="w-5 h-5 text-violet-600" />
+                Evolução do Patrimônio
+              </h3>
+              <div className="text-right">
+                <p className="text-xs text-gray-500">Valor Atual</p>
+                <p className="text-xl font-bold text-violet-600">
+                  R$ {Math.round(totalCurrentValue).toLocaleString("pt-BR")}
+                </p>
               </div>
             </div>
+
+            {investments.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-64 text-gray-400">
+                <TrendingUp className="w-16 h-16 mb-4 opacity-30" />
+                <p className="text-sm font-medium">Nenhum dado ainda</p>
+                <p className="text-xs mt-1">
+                  Faça investimentos para ver a evolução
+                </p>
+              </div>
+            ) : (
+              <div className="relative pl-16">
+                <div className="h-64">
+                  <svg
+                    width="100%"
+                    height="100%"
+                    viewBox="0 0 800 256"
+                    preserveAspectRatio="none"
+                  >
+                    <defs>
+                      <linearGradient
+                        id="areaGradient"
+                        x1="0%"
+                        y1="0%"
+                        x2="0%"
+                        y2="100%"
+                      >
+                        <stop
+                          offset="0%"
+                          stopColor="#8b5cf6"
+                          stopOpacity="0.3"
+                        />
+                        <stop
+                          offset="100%"
+                          stopColor="#a78bfa"
+                          stopOpacity="0.05"
+                        />
+                      </linearGradient>
+                    </defs>
+
+                    {/* Grid */}
+                    {[0, 64, 128, 192, 256].map((y) => (
+                      <line
+                        key={y}
+                        x1="0"
+                        y1={y}
+                        x2="800"
+                        y2={y}
+                        stroke="#f3f4f6"
+                        strokeWidth="1"
+                      />
+                    ))}
+
+                    {/* Área */}
+                    <path
+                      d={`M 0 ${
+                        256 -
+                        Math.min(
+                          (performanceData[0].value /
+                            Math.max(totalCurrentValue, 1)) *
+                            256,
+                          256
+                        )
+                      } ${performanceData
+                        .map(
+                          (d, i) =>
+                            `L ${(i * 800) / (performanceData.length - 1)} ${
+                              256 -
+                              Math.min(
+                                (d.value / Math.max(totalCurrentValue, 1)) *
+                                  256,
+                                256
+                              )
+                            }`
+                        )
+                        .join(" ")} L 800 256 L 0 256 Z`}
+                      fill="url(#areaGradient)"
+                    />
+
+                    {/* Linha */}
+                    <path
+                      d={`M 0 ${
+                        256 -
+                        Math.min(
+                          (performanceData[0].value /
+                            Math.max(totalCurrentValue, 1)) *
+                            256,
+                          256
+                        )
+                      } ${performanceData
+                        .map(
+                          (d, i) =>
+                            `L ${(i * 800) / (performanceData.length - 1)} ${
+                              256 -
+                              Math.min(
+                                (d.value / Math.max(totalCurrentValue, 1)) *
+                                  256,
+                                256
+                              )
+                            }`
+                        )
+                        .join(" ")}`}
+                      fill="none"
+                      stroke="#8b5cf6"
+                      strokeWidth="3"
+                      strokeLinecap="round"
+                      filter="drop-shadow(0 2px 4px rgba(139, 92, 246, 0.3))"
+                    />
+
+                    {/* Pontos */}
+                    {performanceData.map((d, i) => {
+                      const x = (i * 800) / (performanceData.length - 1);
+                      const y =
+                        256 -
+                        Math.min(
+                          (d.value / Math.max(totalCurrentValue, 1)) * 256,
+                          256
+                        );
+                      return (
+                        <circle
+                          key={i}
+                          cx={x}
+                          cy={y}
+                          r="4"
+                          fill="#8b5cf6"
+                          stroke="white"
+                          strokeWidth="2"
+                          filter="drop-shadow(0 2px 3px rgba(139, 92, 246, 0.4))"
+                        />
+                      );
+                    })}
+                  </svg>
+                </div>
+
+                {/* Labels dos meses */}
+                <div className="flex justify-between text-xs text-gray-500 mt-2">
+                  {performanceData.map((d) => (
+                    <span key={d.month}>{d.month}</span>
+                  ))}
+                </div>
+
+                {/* Eixo Y */}
+                <div className="absolute left-0 top-0 h-64 flex flex-col justify-between text-xs text-gray-600">
+                  <span>
+                    R$ {(Math.round(totalCurrentValue) / 1000).toFixed(0)}k
+                  </span>
+                  <span>
+                    R${" "}
+                    {(Math.round(totalCurrentValue * 0.75) / 1000).toFixed(0)}k
+                  </span>
+                  <span>
+                    R$ {(Math.round(totalCurrentValue * 0.5) / 1000).toFixed(0)}
+                    k
+                  </span>
+                  <span>
+                    R${" "}
+                    {(Math.round(totalCurrentValue * 0.25) / 1000).toFixed(0)}k
+                  </span>
+                  <span>R$ 0</span>
+                </div>
+              </div>
+            )}
           </div>
 
-          {/* Allocation Donut Chart */}
-          <div className="bg-white rounded-2xl p-6 border border-violet-100 shadow-lg">
+          {/* Últimos Investimentos */}
+          <div className="bg-white rounded-2xl p-6 border border-violet-100 shadow-xl shadow-violet-200/50">
             <h3 className="text-lg font-bold text-gray-900 mb-6 flex items-center gap-2">
-              <PieChart className="w-5 h-5 text-violet-600" />
-              Diversificação por Setor
+              <Activity className="w-5 h-5 text-violet-600" />
+              Últimos Investimentos
             </h3>
-            <div className="flex flex-col items-center justify-center mb-6">
-              <svg width="180" height="180" viewBox="0 0 200 200">
-                <circle
-                  cx="100"
-                  cy="100"
-                  r="80"
-                  fill="none"
-                  stroke="#ede9fe"
-                  strokeWidth="40"
-                />
-                {allocation.map((item, index) => {
-                  const prevPercentage = allocation
-                    .slice(0, index)
-                    .reduce((sum, i) => sum + i.percentage, 0);
-                  const startAngle = (prevPercentage / 100) * 360 - 90;
-                  const endAngle = startAngle + (item.percentage / 100) * 360;
-
-                  const startRad = (startAngle * Math.PI) / 180;
-                  const endRad = (endAngle * Math.PI) / 180;
-
-                  const x1 = 100 + 80 * Math.cos(startRad);
-                  const y1 = 100 + 80 * Math.sin(startRad);
-                  const x2 = 100 + 80 * Math.cos(endRad);
-                  const y2 = 100 + 80 * Math.sin(endRad);
-
-                  const largeArc = item.percentage > 50 ? 1 : 0;
+            {investments.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 text-gray-400">
+                <Activity className="w-16 h-16 mb-4 opacity-30" />
+                <p className="text-sm font-medium">Nenhum investimento ainda</p>
+                <p className="text-xs mt-1">Comece a investir em MEIs</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {investments.slice(0, 3).map((inv) => {
+                  const getCategoryBadgeColor = (cat: string) => {
+                    const colors: Record<string, string> = {
+                      Alimentação:
+                        "bg-violet-50 text-violet-700 border border-violet-200",
+                      Varejo:
+                        "bg-purple-50 text-purple-700 border border-purple-200",
+                      Logística:
+                        "bg-indigo-50 text-indigo-700 border border-indigo-200",
+                      Beleza: "bg-pink-50 text-pink-700 border border-pink-200",
+                      Outros: "bg-gray-50 text-gray-700 border border-gray-200",
+                    };
+                    return (
+                      colors[cat] ||
+                      "bg-gray-50 text-gray-700 border border-gray-200"
+                    );
+                  };
 
                   return (
-                    <path
-                      key={item.category}
-                      d={`M 100 100 L ${x1} ${y1} A 80 80 0 ${largeArc} 1 ${x2} ${y2} Z`}
-                      fill={item.color}
-                    />
+                    <div
+                      key={inv.id}
+                      className="p-3 rounded-lg bg-gradient-to-r from-white to-violet-50/30 border border-violet-100 hover:border-violet-300 hover:shadow-md transition-all group"
+                    >
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center text-white shadow-md text-sm">
+                            {inv.icon}
+                          </div>
+                          <div>
+                            <p className="font-bold text-gray-900 text-sm group-hover:text-violet-600 transition-colors">
+                              {inv.businessName}
+                            </p>
+                            <span
+                              className={`inline-block text-xs px-2 py-0.5 rounded-md font-semibold mt-0.5 ${getCategoryBadgeColor(
+                                inv.category
+                              )}`}
+                            >
+                              {inv.category}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-xs text-gray-500">Investido</p>
+                          <p className="text-base font-bold text-gray-900">
+                            R${" "}
+                            {inv.investedAmount.toLocaleString("pt-BR", {
+                              minimumFractionDigits: 2,
+                            })}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-2 pt-2 border-t border-violet-100">
+                        <div className="text-center">
+                          <p className="text-xs text-gray-500">Taxa</p>
+                          <p className="text-sm font-bold text-violet-600">
+                            {inv.interestRate}% a.m.
+                          </p>
+                        </div>
+                        <div className="text-center border-x border-violet-100">
+                          <p className="text-xs text-gray-500">Prazo</p>
+                          <p className="text-sm font-bold text-indigo-600">
+                            {inv.duration} meses
+                          </p>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-xs text-gray-500">Retorno</p>
+                          <p className="text-sm font-bold text-green-600">
+                            +{inv.returnPercentage.toFixed(1)}%
+                          </p>
+                        </div>
+                      </div>
+                    </div>
                   );
                 })}
-                <circle cx="100" cy="100" r="50" fill="white" />
-              </svg>
-            </div>
-            <div className="space-y-3">
-              {allocation.map((item) => (
-                <div
-                  key={item.category}
-                  className="flex items-center justify-between"
-                >
-                  <div className="flex items-center gap-2">
-                    <div
-                      className="w-4 h-4 rounded-full shadow-sm"
-                      style={{ backgroundColor: item.color }}
-                    />
-                    <span className="text-sm text-gray-700 font-medium">
-                      {item.category}
-                    </span>
+                {investments.length > 3 && (
+                  <div className="text-center pt-2">
+                    <p className="text-sm text-gray-500">
+                      E mais{" "}
+                      <span className="font-semibold text-violet-600">
+                        {investments.length - 3}
+                      </span>{" "}
+                      investimento{investments.length - 3 > 1 ? "s" : ""}
+                    </p>
                   </div>
-                  <span className="text-sm font-bold text-gray-900">
-                    {item.percentage}%
-                  </span>
-                </div>
-              ))}
-            </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
@@ -987,33 +1092,54 @@ const MinhaCarteira = () => {
           </div>
         </div>
 
-        {/* Risk Analysis */}
+        {/* Summary Stats */}
         <div className="bg-white rounded-2xl p-6 border border-violet-100 shadow-lg">
           <h3 className="text-lg font-bold text-gray-900 mb-6 flex items-center gap-2">
             <BarChart3 className="w-5 h-5 text-violet-600" />
-            Análise de Risco e Performance
+            Resumo dos Investimentos
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-6 border border-blue-200">
               <p className="text-sm text-blue-700 mb-2 font-semibold">
-                Taxa de Sucesso
+                Total Investido
               </p>
-              <p className="text-4xl font-bold text-blue-900 mb-1">96.5%</p>
-              <p className="text-xs text-blue-600">MEIs pagando em dia</p>
+              <p className="text-4xl font-bold text-blue-900 mb-1">
+                R${" "}
+                {portfolioData.investedValue.toLocaleString("pt-BR", {
+                  maximumFractionDigits: 0,
+                })}
+              </p>
+              <p className="text-xs text-blue-600">
+                Em{" "}
+                {portfolioData.activeInvestments +
+                  portfolioData.completedInvestments}{" "}
+                investimentos
+              </p>
             </div>
             <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-6 border border-green-200">
               <p className="text-sm text-green-700 mb-2 font-semibold">
-                Retorno Médio
+                Retorno Total
               </p>
-              <p className="text-4xl font-bold text-green-900 mb-1">+8.6%</p>
-              <p className="text-xs text-green-600">Acima do CDI</p>
+              <p className="text-4xl font-bold text-green-900 mb-1">
+                +{portfolioData.totalReturn.toFixed(1)}%
+              </p>
+              <p className="text-xs text-green-600">
+                R${" "}
+                {(
+                  portfolioData.currentValue - portfolioData.investedValue
+                ).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+              </p>
             </div>
             <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-6 border border-purple-200">
               <p className="text-sm text-purple-700 mb-2 font-semibold">
-                Risco Médio
+                Investimentos Ativos
               </p>
-              <p className="text-4xl font-bold text-purple-900 mb-1">Baixo</p>
-              <p className="text-xs text-purple-600">Carteira diversificada</p>
+              <p className="text-4xl font-bold text-purple-900 mb-1">
+                {portfolioData.activeInvestments}
+              </p>
+              <p className="text-xs text-purple-600">
+                {portfolioData.completedInvestments} finalizados
+              </p>
             </div>
           </div>
         </div>

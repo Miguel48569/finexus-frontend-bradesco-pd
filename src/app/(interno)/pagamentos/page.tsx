@@ -17,6 +17,7 @@ import dividaService, { DividaResponse } from "@/services/divida";
 
 interface EmprestimoAtivo {
   id: number;
+  nome: string; // ✅ Nome da dívida (vem do backend)
   valorTotal: number;
   valorPago: number;
   progresso: number;
@@ -28,11 +29,11 @@ export default function PagamentosPage() {
   const [selectedParcela, setSelectedParcela] =
     useState<ParcelaResponse | null>(null);
   const [pixCopiado, setPixCopiado] = useState(false);
-  
+
   // ✅ ESTADOS PRINCIPAIS
   const [emprestimos, setEmprestimos] = useState<EmprestimoAtivo[]>([]);
   const [currentEmprestimoIndex, setCurrentEmprestimoIndex] = useState(0); // ✅ NOVO: Rastreia qual dívida está ativa
-  
+
   const [boletoUrl, setBoletoUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [isUpdating, setIsUpdating] = useState(false);
@@ -42,20 +43,18 @@ export default function PagamentosPage() {
   const [metodoPagamento, setMetodoPagamento] = useState<
     "pix" | "boleto" | null
   >(null);
-  
+
   // ❌ REMOVIDO o estado 'emprestimo' fixo, pois estava causando o problema.
 
   // --- Funções de Navegação ---
   const goToNextEmprestimo = () => {
-    setCurrentEmprestimoIndex(prevIndex => 
+    setCurrentEmprestimoIndex((prevIndex) =>
       Math.min(prevIndex + 1, emprestimos.length - 1)
     );
   };
 
   const goToPrevEmprestimo = () => {
-    setCurrentEmprestimoIndex(prevIndex => 
-      Math.max(prevIndex - 1, 0)
-    );
+    setCurrentEmprestimoIndex((prevIndex) => Math.max(prevIndex - 1, 0));
   };
 
   // Função para abrir o modal de pagamento
@@ -98,7 +97,7 @@ export default function PagamentosPage() {
       setEmprestimos((prevEmprestimos) => {
         return prevEmprestimos.map((emp) => {
           // Garante que apenas a dívida correta seja atualizada
-          if (emp.id !== selectedParcela.dividaId) return emp; 
+          if (emp.id !== selectedParcela.dividaId) return emp;
 
           const parcelasAtualizadas = emp.parcelas.map((p) =>
             p.id === selectedParcela.id ? { ...p, status: "PAGA" as const } : p
@@ -109,10 +108,9 @@ export default function PagamentosPage() {
             .reduce((acc, p) => acc + p.valor, 0);
 
           const valorTotal = emp.valorTotal;
-          
-          const progresso = valorTotal > 0 
-            ? Math.round((valorPago / valorTotal) * 100)
-            : 0;
+
+          const progresso =
+            valorTotal > 0 ? Math.round((valorPago / valorTotal) * 100) : 0;
 
           return {
             ...emp,
@@ -140,7 +138,7 @@ export default function PagamentosPage() {
   };
 
   const abrirBoleto = async () => {
-    if (!selectedParcela || isUpdating) return; 
+    if (!selectedParcela || isUpdating) return;
 
     setPagamentoErro(null);
 
@@ -151,7 +149,7 @@ export default function PagamentosPage() {
       window.open(url, "_blank");
 
       setMetodoPagamento("boleto");
-      setAguardandoConfirmacao(true); 
+      setAguardandoConfirmacao(true);
     } catch (err) {
       console.error("Erro ao gerar boleto:", err);
       setPagamentoErro("Erro ao gerar boleto. Tente novamente.");
@@ -167,7 +165,7 @@ export default function PagamentosPage() {
     setMetodoPagamento(null);
     setPagamentoErro(null);
   };
-  
+
   // Pegar próximas parcelas do backend
   useEffect(() => {
     const fetchDividas = async () => {
@@ -188,12 +186,16 @@ export default function PagamentosPage() {
 
           const valorTotal = parcelas.reduce((acc, p) => acc + p.valor, 0);
 
-          const progresso = valorTotal > 0 
-            ? Math.round((valorPago / valorTotal) * 100)
-            : 0;
+          const progresso =
+            valorTotal > 0 ? Math.round((valorPago / valorTotal) * 100) : 0;
+
+          // ✅ Busca o nome da proposta do backend
+          const nomeDivida =
+            divida.proposta?.nomeNegocio || `Empréstimo #${divida.id}`;
 
           emprestimosFormatados.push({
             id: divida.id,
+            nome: nomeDivida, // ✅ Nome vindo do backend
             valorTotal,
             valorPago,
             progresso,
@@ -203,8 +205,7 @@ export default function PagamentosPage() {
 
         setEmprestimos(emprestimosFormatados);
         // Se a lista de empréstimos mudar, resetamos o índice para 0
-        setCurrentEmprestimoIndex(0); 
-
+        setCurrentEmprestimoIndex(0);
       } catch (err) {
         console.error("Erro ao carregar dívidas:", err);
       } finally {
@@ -216,22 +217,27 @@ export default function PagamentosPage() {
   }, []);
 
   if (loading) return <p className="p-6 text-center">Carregando parcelas...</p>;
-  
+
   // ✅ Usar o índice para selecionar a dívida ATIVA
   const activeEmprestimo = emprestimos[currentEmprestimoIndex];
   const totalEmprestimos = emprestimos.length;
 
-  if (!activeEmprestimo) return <p className="p-6 text-center">Nenhuma dívida ativa encontrada.</p>;
-  
+  if (!activeEmprestimo)
+    return <p className="p-6 text-center">Nenhuma dívida ativa encontrada.</p>;
+
   // Pega a próxima parcela que precisa ser paga (usando o activeEmprestimo)
   const proximaParcela = activeEmprestimo.parcelas.find(
-    (p) => p.status === "VENCIDA" || p.status === "PENDENTE" || p.status === "ABERTA"
+    (p) =>
+      p.status === "VENCIDA" || p.status === "PENDENTE" || p.status === "ABERTA"
   );
-  
-  const valorProximaParcela = proximaParcela ? proximaParcela.valor.toFixed(2) : "0.00";
-  const vencimentoProximaParcela = proximaParcela ? proximaParcela.vencimento : "N/A";
-  const statusProximaParcela = proximaParcela ? proximaParcela.status : null;
 
+  const valorProximaParcela = proximaParcela
+    ? proximaParcela.valor.toFixed(2)
+    : "0.00";
+  const vencimentoProximaParcela = proximaParcela
+    ? proximaParcela.vencimento
+    : "N/A";
+  const statusProximaParcela = proximaParcela ? proximaParcela.status : null;
 
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
@@ -246,19 +252,17 @@ export default function PagamentosPage() {
       <div className="max-w-4xl mx-auto p-4 space-y-6">
         {/* 1. CARD DE RESUMO (DESTAQUE) */}
         <div className="bg-gradient-to-br from-violet-600 to-violet-500 rounded-2xl p-6 text-white shadow-lg relative overflow-hidden">
-          
           {/* Bolhas decorativas de fundo */}
           <div className="absolute top-0 right-0 -mr-10 -mt-10 w-40 h-40 bg-white opacity-10 rounded-full blur-2xl"></div>
           <div className="absolute bottom-0 left-0 -ml-10 -mb-10 w-40 h-40 bg-purple-500 opacity-20 rounded-full blur-3xl"></div>
 
           <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
+              {/* ✅ Exibe o NOME da dívida vindo do backend */}
               <p className="text-indigo-200 text-sm font-medium mb-1">
-                Dívida Ativa #{activeEmprestimo.id}
+                {activeEmprestimo.nome}
               </p>
-              <h2 className="text-3xl font-bold">
-                R$ {valorProximaParcela}
-              </h2>
+              <h2 className="text-3xl font-bold">R$ {valorProximaParcela}</h2>
               <div className="flex items-center gap-2 mt-2 text-indigo-100 bg-indigo-800/50 px-3 py-1 rounded-full w-fit">
                 <Calendar size={16} />
                 <span className="text-sm font-medium">
@@ -300,38 +304,38 @@ export default function PagamentosPage() {
 
         {/* 2. LISTA DE PARCELAS */}
         <div>
-            {/* ✅ NOVA ESTRUTURA: NOME DO HISTÓRICO + NAVEGAÇÃO */}
-            <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
-                    <PieChart size={20} className="text-violet-800" />
-                    Histórico de Parcelas
-                </h3>
+          {/* ✅ NOVA ESTRUTURA: NOME DO HISTÓRICO + NAVEGAÇÃO */}
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+              <PieChart size={20} className="text-violet-800" />
+              Histórico de Parcelas
+            </h3>
 
-                {/* ✅ BOTÕES DE NAVEGAÇÃO MOVIDOS */}
-                {totalEmprestimos > 1 && (
-                    <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium text-gray-500 hidden sm:block">
-                            Dívida {currentEmprestimoIndex + 1} de {totalEmprestimos}
-                        </span>
-                        <button
-                            onClick={goToPrevEmprestimo}
-                            disabled={currentEmprestimoIndex === 0}
-                            className="p-1.5 rounded-full text-violet-600 border border-violet-200 hover:bg-violet-50 transition disabled:opacity-50 disabled:cursor-not-allowed"
-                            aria-label="Dívida anterior"
-                        >
-                            <ChevronLeft size={20} />
-                        </button>
-                        <button
-                            onClick={goToNextEmprestimo}
-                            disabled={currentEmprestimoIndex === totalEmprestimos - 1}
-                            className="p-1.5 rounded-full text-violet-600 border border-violet-200 hover:bg-violet-50 transition disabled:opacity-50 disabled:cursor-not-allowed"
-                            aria-label="Próxima dívida"
-                        >
-                            <ChevronRight size={20} />
-                        </button>
-                    </div>
-                )}
-            </div>
+            {/* ✅ BOTÕES DE NAVEGAÇÃO MOVIDOS */}
+            {totalEmprestimos > 1 && (
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-gray-500 hidden sm:block">
+                  Dívida {currentEmprestimoIndex + 1} de {totalEmprestimos}
+                </span>
+                <button
+                  onClick={goToPrevEmprestimo}
+                  disabled={currentEmprestimoIndex === 0}
+                  className="p-1.5 rounded-full text-violet-600 border border-violet-200 hover:bg-violet-50 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                  aria-label="Dívida anterior"
+                >
+                  <ChevronLeft size={20} />
+                </button>
+                <button
+                  onClick={goToNextEmprestimo}
+                  disabled={currentEmprestimoIndex === totalEmprestimos - 1}
+                  className="p-1.5 rounded-full text-violet-600 border border-violet-200 hover:bg-violet-50 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                  aria-label="Próxima dívida"
+                >
+                  <ChevronRight size={20} />
+                </button>
+              </div>
+            )}
+          </div>
 
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
             {/* ✅ Itera sobre as parcelas do activeEmprestimo */}
@@ -507,7 +511,7 @@ export default function PagamentosPage() {
                     <AlertCircle
                       size={20}
                       className="text-red-600 shrink-0 mt-0.5"
-                      />
+                    />
                     <p className="text-sm text-red-700 font-medium">
                       {pagamentoErro}
                     </p>

@@ -43,12 +43,6 @@ export default function Sidebar({
     const commonItems = [
       { id: "extrato", label: "Extrato", icon: DollarSign, route: "/extrato" },
       { id: "perfil", label: "Meu Perfil", icon: User, route: "/perfil" },
-      {
-        id: "settings",
-        label: "Configurações",
-        icon: Settings,
-        route: "/settings",
-      },
     ];
 
     if (userType === "INVESTIDOR") {
@@ -59,12 +53,6 @@ export default function Sidebar({
           label: "Marketplace",
           icon: DollarSign,
           route: "/marketplace",
-        },
-        {
-          id: "contratos",
-          label: "Contratos",
-          icon: FileCheck,
-          route: "/contratos",
         },
         ...commonItems,
       ];

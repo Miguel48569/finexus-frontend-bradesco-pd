@@ -1,6 +1,3 @@
-
-
-
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
@@ -149,11 +146,14 @@ export default function InvestorStatement() {
 
         // investimentos
         for (const inv of invs) {
+          const nomeNegocio = inv.proposta?.nomeNegocio || "Negócio";
           uiTxns.push({
             id: `inv-${inv.id}`,
             type: "investment",
-            title: "Investimento realizado",
-            description: inv.proposta?.nomeNegocio ?? "Proposta",
+            title: `Investimento em ${nomeNegocio}`,
+            description: `${nomeNegocio} - ${
+              inv.proposta?.categoria || "Outros"
+            }`,
             date: inv.dataInvestimento ?? new Date().toISOString(),
             amount: -(inv.valorInvestido ?? 0),
             status: inv.status ?? "Concluído",
@@ -186,6 +186,8 @@ export default function InvestorStatement() {
             ? (myInvest.valorInvestido ?? 0) / somaTotal
             : 0;
 
+          const nomeNegocio = myInvest.proposta?.nomeNegocio || "Negócio";
+
           for (const p of parcelas) {
             const st = (p.status ?? "").toUpperCase();
             if (st === "PAGA" || st === "PAGO") {
@@ -194,12 +196,10 @@ export default function InvestorStatement() {
               uiTxns.push({
                 id: `ret-${pid}-${p.id}`,
                 type: "return",
-                title: "Retorno recebido",
-                description: `Parcela #${p.numeroParcela} - Proposta ${pid}`,
+                title: `Retorno de ${nomeNegocio}`,
+                description: `Parcela ${p.numeroParcela}/${parcelas.length} - ${nomeNegocio}`,
                 date:
-                  p.dataPagamento ??
-                  p.vencimento ??
-                  new Date().toISOString(),
+                  p.dataPagamento ?? p.vencimento ?? new Date().toISOString(),
                 amount: Number(valor.toFixed(2)),
                 status: "Concluído",
               });
@@ -328,9 +328,7 @@ export default function InvestorStatement() {
       "data:text/csv;charset=utf-8," +
       rows
         .map((row) =>
-          row
-            .map((col) => `"${String(col).replace(/"/g, '""')}"`)
-            .join(";")
+          row.map((col) => `"${String(col).replace(/"/g, '""')}"`).join(";")
         )
         .join("\n");
 
@@ -363,7 +361,9 @@ export default function InvestorStatement() {
         <div className="max-w-3xl mx-auto bg-white p-6 rounded-xl shadow">
           <h2 className="text-xl font-bold mb-2">Erro</h2>
           <p className="text-red-600 mb-4">{error}</p>
-          <p>Tente limpar o localStorage ou confirmar que o usuário está logado.</p>
+          <p>
+            Tente limpar o localStorage ou confirmar que o usuário está logado.
+          </p>
         </div>
       </div>
     );
@@ -377,7 +377,9 @@ export default function InvestorStatement() {
           <h1 className="text-3xl font-bold mb-2" style={{ color: "#6B21A8" }}>
             Extrato Completo
           </h1>
-          <p className="text-gray-500">Acompanhe todos os seus investimentos e retornos</p>
+          <p className="text-gray-500">
+            Acompanhe todos os seus investimentos e retornos
+          </p>
         </div>
 
         {/* Cards de Resumo */}
@@ -389,8 +391,12 @@ export default function InvestorStatement() {
               </div>
             </div>
             <p className="text-gray-500 text-sm mb-2">Portfólio Total</p>
-            <h2 className="text-3xl font-bold text-gray-800">{formatCurrency(portfolioValue)}</h2>
-            <p className="text-xs text-gray-400 mt-1">Saldo: {saldo ? formatCurrency(saldo.valor) : "—"}</p>
+            <h2 className="text-3xl font-bold text-gray-800">
+              {formatCurrency(portfolioValue)}
+            </h2>
+            <p className="text-xs text-gray-400 mt-1">
+              Saldo: {saldo ? formatCurrency(saldo.valor) : "—"}
+            </p>
           </div>
 
           <div className="bg-white rounded-3xl p-6 shadow-lg border border-green-100 hover:shadow-xl transition-shadow">
@@ -400,7 +406,9 @@ export default function InvestorStatement() {
               </div>
             </div>
             <p className="text-gray-500 text-sm mb-2">Total Investido</p>
-            <h2 className="text-3xl font-bold text-blue-600">{formatCurrency(totalInvested)}</h2>
+            <h2 className="text-3xl font-bold text-blue-600">
+              {formatCurrency(totalInvested)}
+            </h2>
           </div>
 
           <div className="bg-white rounded-3xl p-6 shadow-lg border border-red-100 hover:shadow-xl transition-shadow">
@@ -410,15 +418,19 @@ export default function InvestorStatement() {
               </div>
             </div>
             <p className="text-gray-500 text-sm mb-2">Total em Retornos</p>
-            <h2 className="text-3xl font-bold text-green-600">{formatCurrency(totalReturns)}</h2>
+            <h2 className="text-3xl font-bold text-green-600">
+              {formatCurrency(totalReturns)}
+            </h2>
           </div>
         </div>
 
         {/* Charts */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
           {/* Fluxo Mensal */}
-          <div className="bg-white rounded-3xl p-6 shadow-lg border border-violet-100">
-            <h3 className="text-xl font-bold text-gray-800 mb-4">Fluxo Mensal</h3>
+          <div className="bg-white rounded-3xl p-6 shadow-xl shadow-violet-200/50 border border-violet-100">
+            <h3 className="text-xl font-bold text-gray-800 mb-4">
+              Fluxo Mensal
+            </h3>
             <div className="h-80">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={cashFlowData}>
@@ -432,16 +444,26 @@ export default function InvestorStatement() {
                       borderRadius: "8px",
                     }}
                   />
-                  <Bar dataKey="investimentos" radius={[8, 8, 0, 0]} />
-                  <Bar dataKey="retornos" radius={[8, 8, 0, 0]} />
+                  <Bar
+                    dataKey="investimentos"
+                    fill="#8b5cf6"
+                    radius={[8, 8, 0, 0]}
+                  />
+                  <Bar
+                    dataKey="retornos"
+                    fill="#a78bfa"
+                    radius={[8, 8, 0, 0]}
+                  />
                 </BarChart>
               </ResponsiveContainer>
             </div>
           </div>
 
           {/* Evolução do Portfólio */}
-          <div className="bg-white rounded-3xl p-6 shadow-lg border border-violet-100">
-            <h3 className="text-xl font-bold text-gray-800 mb-4">Evolução do Portfólio</h3>
+          <div className="bg-white rounded-3xl p-6 shadow-xl shadow-violet-200/50 border border-violet-100">
+            <h3 className="text-xl font-bold text-gray-800 mb-4">
+              Evolução do Portfólio
+            </h3>
             <div className="h-80">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={portfolioData}>
@@ -455,7 +477,13 @@ export default function InvestorStatement() {
                       borderRadius: "8px",
                     }}
                   />
-                  <Line type="monotone" dataKey="value" stroke="#7C3AED" strokeWidth={3} dot={{ r: 5 }} />
+                  <Line
+                    type="monotone"
+                    dataKey="value"
+                    stroke="#7C3AED"
+                    strokeWidth={3}
+                    dot={{ r: 5 }}
+                  />
                 </LineChart>
               </ResponsiveContainer>
             </div>
@@ -465,9 +493,14 @@ export default function InvestorStatement() {
         {/* Transações */}
         <div className="bg-white rounded-3xl p-6 shadow-lg border border-violet-100">
           <div className="flex items-center justify-between mb-6">
-            <h3 className="text-xl font-bold text-gray-800">Todas as Transações</h3>
+            <h3 className="text-xl font-bold text-gray-800">
+              Todas as Transações
+            </h3>
             <div className="flex items-center gap-3">
-              <button onClick={exportCSV} className="flex items-center gap-2 px-4 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-700 transition-all">
+              <button
+                onClick={exportCSV}
+                className="flex items-center gap-2 px-4 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-700 transition-all"
+              >
                 <Download size={18} />
                 Exportar
               </button>
@@ -484,19 +517,31 @@ export default function InvestorStatement() {
               className="w-full lg:w-64 pl-4 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:border-violet-500 focus:outline-none transition-all text-sm text-gray-700 placeholder-gray-400"
             />
 
-            <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} className="px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-700">
+            <select
+              value={typeFilter}
+              onChange={(e) => setTypeFilter(e.target.value)}
+              className="px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-700"
+            >
               <option>Todos os tipos</option>
               <option>Investimentos</option>
               <option>Retornos</option>
             </select>
 
-            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-700">
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-700"
+            >
               <option>Todos os status</option>
               <option>Concluído</option>
               <option>Pendente</option>
             </select>
 
-            <select value={periodFilter} onChange={(e) => setPeriodFilter(e.target.value)} className="px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-700">
+            <select
+              value={periodFilter}
+              onChange={(e) => setPeriodFilter(e.target.value)}
+              className="px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-700"
+            >
               <option>Últimos 30 dias</option>
               <option>Últimos 60 dias</option>
               <option>Últimos 90 dias</option>
@@ -505,7 +550,11 @@ export default function InvestorStatement() {
 
           {/* Lista de Transações */}
           <div className="space-y-3">
-            {filteredTransactions.length === 0 && <div className="text-gray-500 p-4">Nenhuma transação encontrada.</div>}
+            {filteredTransactions.length === 0 && (
+              <div className="text-gray-500 p-4">
+                Nenhuma transação encontrada.
+              </div>
+            )}
 
             {filteredTransactions.map((transaction) => (
               <div
@@ -513,7 +562,13 @@ export default function InvestorStatement() {
                 className="flex items-center justify-between p-5 bg-gradient-to-r from-gray-50 to-white hover:from-violet-50 hover:to-white rounded-2xl transition-all cursor-pointer border border-gray-100 hover:border-violet-200 hover:shadow-md"
               >
                 <div className="flex items-center gap-4 flex-1">
-                  <div className={`p-3 rounded-xl shadow-sm ${transaction.type === "investment" ? "bg-blue-100" : "bg-green-100"}`}>
+                  <div
+                    className={`p-3 rounded-xl shadow-sm ${
+                      transaction.type === "investment"
+                        ? "bg-blue-100"
+                        : "bg-green-100"
+                    }`}
+                  >
                     {transaction.type === "investment" ? (
                       <TrendingUp className="text-blue-600" size={24} />
                     ) : (
@@ -522,22 +577,41 @@ export default function InvestorStatement() {
                   </div>
 
                   <div className="flex-1">
-                    <div className="font-semibold text-gray-800 mb-1">{transaction.title}</div>
+                    <div className="font-semibold text-gray-800 mb-1">
+                      {transaction.title}
+                    </div>
                     <div className="flex items-center gap-2">
-                      <span className="text-sm text-gray-600">{transaction.description}</span>
+                      <span className="text-sm text-gray-600">
+                        {transaction.description}
+                      </span>
                       <span className="text-gray-300">•</span>
-                      <span className="text-sm text-gray-500">{new Date(transaction.date).toLocaleDateString("pt-BR")}</span>
+                      <span className="text-sm text-gray-500">
+                        {new Date(transaction.date).toLocaleDateString("pt-BR")}
+                      </span>
                     </div>
                   </div>
 
-                  <span className={`px-4 py-1.5 rounded-full text-xs font-semibold ${transaction.status === "Concluído" ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"}`}>
+                  <span
+                    className={`px-4 py-1.5 rounded-full text-xs font-semibold ${
+                      transaction.status === "Concluído"
+                        ? "bg-green-100 text-green-700"
+                        : "bg-yellow-100 text-yellow-700"
+                    }`}
+                  >
                     {transaction.status}
                   </span>
                 </div>
 
                 <div className="text-right ml-6">
-                  <p className={`text-xl font-bold ${transaction.amount > 0 ? "text-green-600" : "text-blue-600"}`}>
-                    {transaction.amount > 0 ? "+" : ""}{formatCurrency(transaction.amount)}
+                  <p
+                    className={`text-xl font-bold ${
+                      transaction.amount > 0
+                        ? "text-green-600"
+                        : "text-blue-600"
+                    }`}
+                  >
+                    {transaction.amount > 0 ? "+" : ""}
+                    {formatCurrency(transaction.amount)}
                   </p>
                 </div>
               </div>
