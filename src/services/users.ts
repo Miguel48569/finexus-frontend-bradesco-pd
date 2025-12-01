@@ -64,12 +64,9 @@ export const userService = {
   // 3.1 BUSCAR USUÁRIO POR CPF (GET /usuarios/cpf/{cpf})
   // Atenção: Este endpoint usa proxy direto sem /api
   getByCpf: async (cpf: string) => {
-    const response = await axios.get(`/usuarios/cpf/${cpf}`, {
-      headers: { "Content-Type": "application/json" },
-      timeout: 30000,
-    });
-    return response.data;
-  },
+  const response = await api.get(`/usuarios/cpf/${cpf}`);
+  return response.data;
+},
 
   // 4. ATUALIZAR DADOS (PUT /usuarios/{id})
   update: async (id: number | string, dados: AtualizarUsuarioRequest) => {

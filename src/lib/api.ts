@@ -2,7 +2,7 @@ import axios, { AxiosInstance, AxiosError } from "axios";
 import { parseCookies, destroyCookie } from "nookies"; // 1. Importamos o nookies
 
 const api: AxiosInstance = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL,
+  baseURL: process.env.NEXT_PUBLIC_API_URL || "https://finexus-backend.onrender.com",
   headers: {
     "Content-Type": "application/json",
   },

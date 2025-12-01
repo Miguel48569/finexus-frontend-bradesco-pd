@@ -8,10 +8,12 @@ import {
   AlertCircle,
   Copy,
   ChevronRight,
+  ChevronLeft, // ✅ Importação do ChevronLeft
   DollarSign,
   PieChart,
 } from "lucide-react";
 import { parcelaService, ParcelaResponse } from "@/services/parcela";
+import dividaService, { DividaResponse } from "@/services/divida";
 
 interface EmprestimoAtivo {
   id: number;
@@ -26,22 +28,35 @@ export default function PagamentosPage() {
   const [selectedParcela, setSelectedParcela] =
     useState<ParcelaResponse | null>(null);
   const [pixCopiado, setPixCopiado] = useState(false);
+  
+  // ✅ ESTADOS PRINCIPAIS
+  const [emprestimos, setEmprestimos] = useState<EmprestimoAtivo[]>([]);
+  const [currentEmprestimoIndex, setCurrentEmprestimoIndex] = useState(0); // ✅ NOVO: Rastreia qual dívida está ativa
+  
   const [boletoUrl, setBoletoUrl] = useState<string | null>(null);
-  const [emprestimo, setEmprestimo] = useState<EmprestimoAtivo>({
-    id: 1, // aqui você pode colocar o ID real do empréstimo
-    valorTotal: 0,
-    valorPago: 0,
-    progresso: 0,
-    parcelas: [],
-  });
   const [loading, setLoading] = useState(true);
-  const [isUpdating, setIsUpdating] = useState(false); // ✅ Controle de atualização
-  const [pagamentoSucesso, setPagamentoSucesso] = useState(false); // ✅ Modal de sucesso
-  const [pagamentoErro, setPagamentoErro] = useState<string | null>(null); // ✅ Mensagem de erro
-  const [aguardandoConfirmacao, setAguardandoConfirmacao] = useState(false); // ✅ Estado de confirmação
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [pagamentoSucesso, setPagamentoSucesso] = useState(false);
+  const [pagamentoErro, setPagamentoErro] = useState<string | null>(null);
+  const [aguardandoConfirmacao, setAguardandoConfirmacao] = useState(false);
   const [metodoPagamento, setMetodoPagamento] = useState<
     "pix" | "boleto" | null
-  >(null); // ✅ Método escolhido
+  >(null);
+  
+  // ❌ REMOVIDO o estado 'emprestimo' fixo, pois estava causando o problema.
+
+  // --- Funções de Navegação ---
+  const goToNextEmprestimo = () => {
+    setCurrentEmprestimoIndex(prevIndex => 
+      Math.min(prevIndex + 1, emprestimos.length - 1)
+    );
+  };
+
+  const goToPrevEmprestimo = () => {
+    setCurrentEmprestimoIndex(prevIndex => 
+      Math.max(prevIndex - 1, 0)
+    );
+  };
 
   // Função para abrir o modal de pagamento
   const handlePagar = (parcela: ParcelaResponse) => {
@@ -61,12 +76,12 @@ export default function PagamentosPage() {
     );
     setPixCopiado(true);
     setMetodoPagamento("pix");
-    setAguardandoConfirmacao(true); // ✅ Ativa modo de confirmação
+    setAguardandoConfirmacao(true);
     setTimeout(() => setPixCopiado(false), 3000);
   };
 
   const pagarParcela = async () => {
-    if (!selectedParcela || isUpdating) return; // ✅ Previne múltiplas chamadas
+    if (!selectedParcela || isUpdating) return;
 
     setIsUpdating(true);
     setPagamentoErro(null);
@@ -79,30 +94,37 @@ export default function PagamentosPage() {
 
       await parcelaService.pagar(selectedParcela.id, Number(userId));
 
-      // Atualiza UI localmente
-      setEmprestimo((prev) => {
-        const parcelasAtualizadas = prev.parcelas.map((p) =>
-          p.id === selectedParcela.id ? { ...p, status: "PAGA" as const } : p
-        );
+      // ✅ Atualiza UI localmente no array 'emprestimos'
+      setEmprestimos((prevEmprestimos) => {
+        return prevEmprestimos.map((emp) => {
+          // Garante que apenas a dívida correta seja atualizada
+          if (emp.id !== selectedParcela.dividaId) return emp; 
 
-        const valorPago = parcelasAtualizadas
-          .filter((p) => p.status === "PAGA")
-          .reduce((acc, p) => acc + p.valor, 0);
+          const parcelasAtualizadas = emp.parcelas.map((p) =>
+            p.id === selectedParcela.id ? { ...p, status: "PAGA" as const } : p
+          );
 
-        const progresso = Math.round((valorPago / prev.valorTotal) * 100);
+          const valorPago = parcelasAtualizadas
+            .filter((p) => p.status === "PAGA")
+            .reduce((acc, p) => acc + p.valor, 0);
 
-        return {
-          ...prev,
-          parcelas: parcelasAtualizadas,
-          valorPago,
-          progresso,
-        };
+          const valorTotal = emp.valorTotal;
+          
+          const progresso = valorTotal > 0 
+            ? Math.round((valorPago / valorTotal) * 100)
+            : 0;
+
+          return {
+            ...emp,
+            parcelas: parcelasAtualizadas,
+            valorPago,
+            progresso,
+          };
+        });
       });
 
-      // ✅ Exibe modal de sucesso
       setPagamentoSucesso(true);
 
-      // Fecha modal de pagamento após 2 segundos
       setTimeout(() => {
         setModalOpen(false);
         setPagamentoSucesso(false);
@@ -118,7 +140,7 @@ export default function PagamentosPage() {
   };
 
   const abrirBoleto = async () => {
-    if (!selectedParcela || isUpdating) return; // ✅ Previne múltiplas execuções
+    if (!selectedParcela || isUpdating) return; 
 
     setPagamentoErro(null);
 
@@ -129,78 +151,87 @@ export default function PagamentosPage() {
       window.open(url, "_blank");
 
       setMetodoPagamento("boleto");
-      setAguardandoConfirmacao(true); // ✅ Ativa modo de confirmação
+      setAguardandoConfirmacao(true); 
     } catch (err) {
       console.error("Erro ao gerar boleto:", err);
       setPagamentoErro("Erro ao gerar boleto. Tente novamente.");
     }
   };
 
-  // ✅ Confirmar pagamento após usuário clicar em "Confirmar"
   const confirmarPagamento = async () => {
     await pagarParcela();
   };
 
-  // ✅ Cancelar e voltar ao modal inicial
   const cancelarPagamento = () => {
     setAguardandoConfirmacao(false);
     setMetodoPagamento(null);
     setPagamentoErro(null);
   };
+  
   // Pegar próximas parcelas do backend
   useEffect(() => {
-    let isMounted = true; // ✅ Previne atualizações após desmontagem
-
-    const fetchParcelas = async () => {
+    const fetchDividas = async () => {
       try {
-        const userId = localStorage.getItem("userId");
-        if (!userId || !isMounted) return;
+        const userId = Number(localStorage.getItem("userId"));
+        if (!userId) return;
 
-        // Substitua pelo ID da dívida que você quer buscar
-        const idDivida = 1;
-        const parcelas = await parcelaService.listarPorDivida(idDivida);
+        const dividas = await dividaService.getByTomador(userId);
 
-        if (!isMounted) return; // ✅ Verifica novamente antes de atualizar
+        const emprestimosFormatados: EmprestimoAtivo[] = [];
 
-        const valorPago = parcelas
-          .filter((p) => p.status === "PAGA")
-          .reduce((acc, p) => acc + p.valor, 0);
+        for (const divida of dividas) {
+          const parcelas = await parcelaService.listarPorDivida(divida.id);
 
-        const valorTotal = parcelas.reduce((acc, p) => acc + p.valor, 0);
+          const valorPago = parcelas
+            .filter((p) => p.status === "PAGA")
+            .reduce((acc, p) => acc + p.valor, 0);
 
-        const progresso = Math.round((valorPago / valorTotal) * 100);
+          const valorTotal = parcelas.reduce((acc, p) => acc + p.valor, 0);
 
-        if (isMounted) {
-          setEmprestimo({
-            id: idDivida,
+          const progresso = valorTotal > 0 
+            ? Math.round((valorPago / valorTotal) * 100)
+            : 0;
+
+          emprestimosFormatados.push({
+            id: divida.id,
             valorTotal,
             valorPago,
             progresso,
             parcelas,
           });
         }
+
+        setEmprestimos(emprestimosFormatados);
+        // Se a lista de empréstimos mudar, resetamos o índice para 0
+        setCurrentEmprestimoIndex(0); 
+
       } catch (err) {
-        console.error("Erro ao carregar parcelas:", err);
+        console.error("Erro ao carregar dívidas:", err);
       } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
+        setLoading(false);
       }
     };
 
-    fetchParcelas();
-
-    return () => {
-      isMounted = false; // ✅ Cleanup function
-    };
+    fetchDividas();
   }, []);
 
   if (loading) return <p className="p-6 text-center">Carregando parcelas...</p>;
+  
+  // ✅ Usar o índice para selecionar a dívida ATIVA
+  const activeEmprestimo = emprestimos[currentEmprestimoIndex];
+  const totalEmprestimos = emprestimos.length;
 
-  // Pega a próxima parcela que precisa ser paga
-  const proximaParcela = emprestimo.parcelas.find(
-    (p) => p.status === "VENCIDA" || p.status === "PENDENTE"
+  if (!activeEmprestimo) return <p className="p-6 text-center">Nenhuma dívida ativa encontrada.</p>;
+  
+  // Pega a próxima parcela que precisa ser paga (usando o activeEmprestimo)
+  const proximaParcela = activeEmprestimo.parcelas.find(
+    (p) => p.status === "VENCIDA" || p.status === "PENDENTE" || p.status === "ABERTA"
   );
+  
+  const valorProximaParcela = proximaParcela ? proximaParcela.valor.toFixed(2) : "0.00";
+  const vencimentoProximaParcela = proximaParcela ? proximaParcela.vencimento : "N/A";
+  const statusProximaParcela = proximaParcela ? proximaParcela.status : null;
+
 
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
@@ -215,6 +246,7 @@ export default function PagamentosPage() {
       <div className="max-w-4xl mx-auto p-4 space-y-6">
         {/* 1. CARD DE RESUMO (DESTAQUE) */}
         <div className="bg-gradient-to-br from-violet-600 to-violet-500 rounded-2xl p-6 text-white shadow-lg relative overflow-hidden">
+          
           {/* Bolhas decorativas de fundo */}
           <div className="absolute top-0 right-0 -mr-10 -mt-10 w-40 h-40 bg-white opacity-10 rounded-full blur-2xl"></div>
           <div className="absolute bottom-0 left-0 -ml-10 -mb-10 w-40 h-40 bg-purple-500 opacity-20 rounded-full blur-3xl"></div>
@@ -222,17 +254,17 @@ export default function PagamentosPage() {
           <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
               <p className="text-indigo-200 text-sm font-medium mb-1">
-                Próximo Vencimento
+                Dívida Ativa #{activeEmprestimo.id}
               </p>
               <h2 className="text-3xl font-bold">
-                R$ {proximaParcela?.valor.toFixed(2)}
+                R$ {valorProximaParcela}
               </h2>
               <div className="flex items-center gap-2 mt-2 text-indigo-100 bg-indigo-800/50 px-3 py-1 rounded-full w-fit">
                 <Calendar size={16} />
                 <span className="text-sm font-medium">
-                  {proximaParcela?.vencimento}
+                  {vencimentoProximaParcela}
                 </span>
-                {proximaParcela?.status === "VENCIDA" && (
+                {statusProximaParcela === "VENCIDA" && (
                   <span className="ml-2 bg-red-500 text-white text-xs px-2 py-0.5 rounded-full font-bold">
                     VENCIDA
                   </span>
@@ -247,18 +279,20 @@ export default function PagamentosPage() {
                   Empréstimo Quitado
                 </span>
                 <span className="font-bold">
-                  {Number(emprestimo.progresso).toFixed(2)}%
+                  {/* ✅ Usa activeEmprestimo */}
+                  {Number(activeEmprestimo.progresso).toFixed(2)}%
                 </span>
               </div>
               <div className="w-full bg-violet-900 rounded-full h-2.5">
                 <div
                   className="bg-gradient-to-r from-green-400 to-emerald-500 h-2.5 rounded-full transition-all duration-1000"
-                  style={{ width: `${emprestimo.progresso}%` }}
+                  style={{ width: `${activeEmprestimo.progresso}%` }}
                 ></div>
               </div>
-              <p className="text-xs text-white  font-medium mt-2 text-right">
-                R$ {Number(emprestimo.valorPago).toFixed(2)} de R${" "}
-                {Number(emprestimo.valorTotal).toFixed(2)}
+              <p className="text-xs text-white  font-medium mt-2 text-right">
+                R$ {Number(activeEmprestimo.valorPago).toFixed(2)} de R${" "}
+                {/* ✅ Usa activeEmprestimo */}
+                {Number(activeEmprestimo.valorTotal).toFixed(2)}
               </p>
             </div>
           </div>
@@ -266,13 +300,42 @@ export default function PagamentosPage() {
 
         {/* 2. LISTA DE PARCELAS */}
         <div>
-          <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-            <PieChart size={20} className="text-violet-800" />
-            Histórico de Parcelas
-          </h3>
+            {/* ✅ NOVA ESTRUTURA: NOME DO HISTÓRICO + NAVEGAÇÃO */}
+            <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                    <PieChart size={20} className="text-violet-800" />
+                    Histórico de Parcelas
+                </h3>
+
+                {/* ✅ BOTÕES DE NAVEGAÇÃO MOVIDOS */}
+                {totalEmprestimos > 1 && (
+                    <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium text-gray-500 hidden sm:block">
+                            Dívida {currentEmprestimoIndex + 1} de {totalEmprestimos}
+                        </span>
+                        <button
+                            onClick={goToPrevEmprestimo}
+                            disabled={currentEmprestimoIndex === 0}
+                            className="p-1.5 rounded-full text-violet-600 border border-violet-200 hover:bg-violet-50 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                            aria-label="Dívida anterior"
+                        >
+                            <ChevronLeft size={20} />
+                        </button>
+                        <button
+                            onClick={goToNextEmprestimo}
+                            disabled={currentEmprestimoIndex === totalEmprestimos - 1}
+                            className="p-1.5 rounded-full text-violet-600 border border-violet-200 hover:bg-violet-50 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                            aria-label="Próxima dívida"
+                        >
+                            <ChevronRight size={20} />
+                        </button>
+                    </div>
+                )}
+            </div>
 
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-            {emprestimo.parcelas.map((parcela) => (
+            {/* ✅ Itera sobre as parcelas do activeEmprestimo */}
+            {activeEmprestimo.parcelas.map((parcela) => (
               <div
                 key={parcela.id}
                 className={`flex items-center justify-between p-4 border-b last:border-0 hover:bg-gray-50 transition-colors ${
@@ -303,7 +366,7 @@ export default function PagamentosPage() {
                   </div>
                   <div>
                     <p className="font-bold text-gray-800">
-                      Parcela #{parcela.id}
+                      Parcela #{parcela.numeroParcela}
                     </p>
                     <p
                       className={`text-sm ${
@@ -348,7 +411,7 @@ export default function PagamentosPage() {
         </div>
       </div>
 
-      {/* 3. MODAL DE PAGAMENTO (PIX) */}
+      {/* 3. MODAL DE PAGAMENTO (PIX) - Sem alterações de layout */}
       {modalOpen && selectedParcela && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 relative animate-in fade-in zoom-in duration-200">
@@ -360,7 +423,7 @@ export default function PagamentosPage() {
               ✕
             </button>
 
-            {/* ✅ CARD DE SUCESSO */}
+            {/* CARD DE SUCESSO */}
             {pagamentoSucesso ? (
               <div className="text-center py-8">
                 <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4 animate-bounce">
@@ -370,7 +433,7 @@ export default function PagamentosPage() {
                   Pagamento Confirmado!
                 </h3>
                 <p className="text-gray-600 mb-4">
-                  Parcela #{selectedParcela.id} foi paga com sucesso.
+                  Parcela #{selectedParcela.numeroParcela} foi paga com sucesso.
                 </p>
                 <div className="bg-green-50 border border-green-200 rounded-lg p-4">
                   <p className="text-sm text-green-700 font-medium">
@@ -382,7 +445,7 @@ export default function PagamentosPage() {
                 </div>
               </div>
             ) : aguardandoConfirmacao ? (
-              /* ✅ CARD DE CONFIRMAÇÃO */
+              /* CARD DE CONFIRMAÇÃO */
               <div className="text-center py-6">
                 <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
                   <AlertCircle size={32} className="text-amber-600" />
@@ -397,7 +460,7 @@ export default function PagamentosPage() {
                 </p>
                 <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4 mb-6">
                   <p className="text-sm text-indigo-700 font-medium">
-                    Parcela #{selectedParcela.id}
+                    Parcela #{selectedParcela.numeroParcela}
                   </p>
                   <p className="text-2xl font-bold text-indigo-900 mt-2">
                     R$ {selectedParcela.valor.toFixed(2)}
@@ -438,13 +501,13 @@ export default function PagamentosPage() {
               </div>
             ) : (
               <>
-                {/* ✅ CARD DE ERRO */}
+                {/* CARD DE ERRO */}
                 {pagamentoErro && (
                   <div className="mb-4 bg-red-50 border border-red-200 rounded-lg p-3 flex items-start gap-2">
                     <AlertCircle
                       size={20}
                       className="text-red-600 shrink-0 mt-0.5"
-                    />
+                      />
                     <p className="text-sm text-red-700 font-medium">
                       {pagamentoErro}
                     </p>
@@ -459,7 +522,7 @@ export default function PagamentosPage() {
                     Realizar Pagamento
                   </h3>
                   <p className="text-gray-500">
-                    Parcela #{selectedParcela.id} - Vencimento{" "}
+                    Parcela #{selectedParcela.numeroParcela} - Vencimento{" "}
                     {selectedParcela.vencimento}
                   </p>
                 </div>
@@ -491,11 +554,11 @@ export default function PagamentosPage() {
                   onClick={copiarPix}
                   disabled={isUpdating}
                   className={`w-full mt-3 py-3.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed
-    ${
-      pixCopiado
-        ? "bg-green-500 text-white"
-        : "bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-200"
-    }`}
+                    ${
+                      pixCopiado
+                        ? "bg-green-500 text-white"
+                        : "bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-200"
+                    }`}
                 >
                   {isUpdating ? (
                     "Processando..."
