@@ -7,7 +7,10 @@ import {
   PropostaRequest,
   PropostaResponse,
 } from "@/services/proposta";
-import { investimentoService, InvestimentoResponse } from "@/services/investimento";
+import {
+  investimentoService,
+  InvestimentoResponse,
+} from "@/services/investimento";
 import { useParams, useRouter } from "next/navigation";
 import {
   ArrowLeft,
@@ -107,9 +110,10 @@ export default function DetalhesInvestimentoPage() {
     sucesso: boolean;
     mensagem: string;
   } | null>(null);
-  
+
   // 🆕 NOVO: Estado para armazenar o investimento criado
-  const [investimentoCriado, setInvestimentoCriado] = useState<InvestimentoResponse | null>(null);
+  const [investimentoCriado, setInvestimentoCriado] =
+    useState<InvestimentoResponse | null>(null);
   const [criandoInvestimento, setCriandoInvestimento] = useState(false);
 
   // 🆕 NOVA FUNÇÃO: Criar investimento (chamada pelo botão "Investir Agora")
@@ -159,7 +163,7 @@ export default function DetalhesInvestimentoPage() {
 
     try {
       setCriandoInvestimento(true);
-      
+
       const payload = {
         idInvestidor: userId,
         idProposta: Number(investimento.id),
@@ -170,12 +174,11 @@ export default function DetalhesInvestimentoPage() {
 
       // Cria o investimento e armazena a resposta
       const response = await investimentoService.criar(payload);
-      
+
       console.log("✅ Investimento criado:", response);
-      
+
       setInvestimentoCriado(response);
       setShowModalInvestir(true); // Abre o modal com os dados do investimento
-      
     } catch (err: any) {
       console.error("Erro ao criar investimento:", err);
       const mensagemErro =
@@ -253,9 +256,53 @@ export default function DetalhesInvestimentoPage() {
       try {
         const dados = await propostaService.buscarPorId(Number(id));
 
+        // Buscar número real de investidores
+        let numeroInvestidores = 0;
+        try {
+          const investimentos = await investimentoService.listarPorProposta(
+            Number(id)
+          );
+          numeroInvestidores = investimentos.length;
+        } catch (error) {
+          console.error("Erro ao buscar investidores:", error);
+        }
+
+        // Calcular dias restantes baseado na data de criação (30 dias de prazo)
+        let diasRestantes = 30;
+        if (dados.dataCriacao) {
+          const dataCriacao = new Date(dados.dataCriacao);
+          const dataLimite = new Date(dataCriacao);
+          dataLimite.setDate(dataLimite.getDate() + 30);
+          const hoje = new Date();
+          const diffTime = dataLimite.getTime() - hoje.getTime();
+          diasRestantes = Math.max(
+            0,
+            Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+          );
+        }
+
+        // Calcular ano de fundação baseado no tempo de atuação
+        const anoAtual = new Date().getFullYear();
+        const anoFundacao =
+          anoAtual - Math.floor((dados.tempoAtuacaoMeses || 12) / 12);
+
+        // Calcular risco baseado na taxa de juros
+        let risco: RiskLevel = "Médio";
+        if (dados.taxaJuros <= 1) {
+          risco = "Baixo";
+        } else if (dados.taxaJuros <= 1.5) {
+          risco = "Médio";
+        } else {
+          risco = "Alto";
+        }
+
+        // Calcular investimento mínimo (menor valor entre 100 e o que falta)
+        const valorRestante = dados.valorSolicitado - dados.saldoInvestido;
+        const investimentoMinimo = Math.min(100, valorRestante);
+
         const investimentoConvertido: InvestmentDetails = {
           id: String(dados.id),
-          meiName: "MEI", // você pode mudar depois se quiser
+          meiName: dados.solicitante?.nome || "MEI",
           businessName: dados.nomeNegocio,
           description: dados.descricaoNegocio,
           fullDescription: dados.descricaoUsoRecurso || dados.descricaoNegocio,
@@ -266,20 +313,16 @@ export default function DetalhesInvestimentoPage() {
           ),
           interestRate: dados.taxaJuros,
           duration: dados.prazoMeses,
-          minInvestment: 100,
-          risk: "Médio",
+          minInvestment: investimentoMinimo,
+          risk: risco,
           category: dados.categoria,
           type: "Empréstimo",
-
-          // ❗ Esses dados *não existem* no back, então setei valores padrão:
-          investors: 0,
-          daysLeft: 30,
-
+          investors: numeroInvestidores,
+          daysLeft: diasRestantes,
           documents: [],
-
           businessInfo: {
             cnpj: dados.cnpj,
-            foundedYear: 2020,
+            foundedYear: anoFundacao,
             employees: 1,
             monthlyRevenue: dados.faturamentoMensal,
           },
@@ -597,7 +640,11 @@ export default function DetalhesInvestimentoPage() {
                 {/* 🔄 BOTÃO MODIFICADO: Agora chama criarInvestimento */}
                 <button
                   onClick={criarInvestimento}
-                  disabled={criandoInvestimento || !valorSimulacao || parseBRL(valorSimulacao) < investimento.minInvestment}
+                  disabled={
+                    criandoInvestimento ||
+                    !valorSimulacao ||
+                    parseBRL(valorSimulacao) < investimento.minInvestment
+                  }
                   className="w-full bg-gradient-to-r from-violet-500 to-purple-500 hover:from-violet-600 hover:to-purple-600 text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:shadow-xl transition-all transform hover:scale-105 mb-3 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
                 >
                   {criandoInvestimento ? "Criando..." : "Investir Agora"}
@@ -753,28 +800,39 @@ export default function DetalhesInvestimentoPage() {
                 </span>{" "}
                 foi criado!
               </p>
-              
+
               <div className="bg-gray-50 rounded-xl p-4 mb-6 flex flex-col gap-2">
                 <div className="flex justify-between items-center">
-                  <span className="text-gray-500 text-sm">ID do Investimento</span>
-                  <span className="font-semibold text-gray-900">#{investimentoCriado.id}</span>
+                  <span className="text-gray-500 text-sm">
+                    ID do Investimento
+                  </span>
+                  <span className="font-semibold text-gray-900">
+                    #{investimentoCriado.id}
+                  </span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-gray-500 text-sm">Valor Investido</span>
                   <span className="text-2xl font-bold text-violet-700">
-                    R$ {investimentoCriado.valorInvestido.toLocaleString("pt-BR", {
+                    R${" "}
+                    {investimentoCriado.valorInvestido.toLocaleString("pt-BR", {
                       minimumFractionDigits: 2,
                       maximumFractionDigits: 2,
                     })}
                   </span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-gray-500 text-sm">Rendimento Esperado</span>
+                  <span className="text-gray-500 text-sm">
+                    Rendimento Esperado
+                  </span>
                   <span className="font-semibold text-green-600">
-                    R$ {investimentoCriado.rendimentoEsperado.toLocaleString("pt-BR", {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}
+                    R${" "}
+                    {investimentoCriado.rendimentoEsperado.toLocaleString(
+                      "pt-BR",
+                      {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      }
+                    )}
                   </span>
                 </div>
                 <div className="flex justify-between items-center">
@@ -789,16 +847,17 @@ export default function DetalhesInvestimentoPage() {
               {investimentoCriado.qrCodeUrl && (
                 <div className="bg-white border-2 border-gray-200 rounded-xl p-4 mb-6 text-center">
                   <p className="text-sm text-gray-600 mb-3">Pague com PIX</p>
-                  <img 
-                    src={investimentoCriado.qrCodeUrl} 
-                    alt="QR Code PIX" 
+                  <img
+                    src={investimentoCriado.qrCodeUrl}
+                    alt="QR Code PIX"
                     className="w-48 h-48 mx-auto"
                   />
                 </div>
               )}
 
               <p className="text-sm text-gray-600 text-center mb-6">
-                Clique em "Confirmar Pagamento" após realizar o pagamento para finalizar o investimento.
+                Clique em "Confirmar Pagamento" após realizar o pagamento para
+                finalizar o investimento.
               </p>
 
               <div className="flex gap-3 mt-6">

@@ -6,6 +6,7 @@
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { propostaService, PropostaResponse } from "@/services/proposta";
+import { investimentoService } from "@/services/investimento";
 import {
   Search,
   ChevronDown,
@@ -94,23 +95,58 @@ export default function MarketplacePage() {
 
         if (!isMounted) return; // ✅ Verifica se ainda está montado
 
-        const convertidas: Opportunity[] = propostas.map((p) => ({
-          id: String(p.id),
-          meiName: "MEI",
-          businessName: p.nomeNegocio,
-          description: p.descricaoNegocio,
-          totalValue: p.valorSolicitado,
-          currentValue: p.saldoInvestido,
-          progress: Math.floor((p.saldoInvestido / p.valorSolicitado) * 100),
-          interestRate: p.taxaJuros,
-          duration: p.prazoMeses,
-          minInvestment: 100,
-          risk: "Médio",
-          type: "Empréstimo",
-          category: p.categoria,
-          investors: 0,
-          daysLeft: 30,
-        }));
+        // ✅ Filtra apenas propostas que ainda não atingiram 100% (com dados do backend)
+        const propostasDisponiveis = propostas.filter((p) => {
+          const progresso = (p.saldoInvestido / p.valorSolicitado) * 100;
+          return progresso < 100;
+        });
+
+        // Buscar número de investidores para cada proposta
+        const convertidas: Opportunity[] = await Promise.all(
+          propostasDisponiveis.map(async (p) => {
+            const progresso = Math.floor(
+              (p.saldoInvestido / p.valorSolicitado) * 100
+            );
+            const valorRestante = p.valorSolicitado - p.saldoInvestido;
+
+            // Buscar investidores reais da proposta
+            let numeroInvestidores = 0;
+            try {
+              const investimentos = await investimentoService.listarPorProposta(
+                p.id
+              );
+              numeroInvestidores = investimentos.length;
+            } catch (error) {
+              console.error(
+                `Erro ao buscar investidores da proposta ${p.id}:`,
+                error
+              );
+            }
+
+            return {
+              id: String(p.id),
+              meiName: p.solicitante?.nome || "MEI",
+              businessName: p.nomeNegocio,
+              description: p.descricaoNegocio,
+              totalValue: p.valorSolicitado,
+              currentValue: p.saldoInvestido,
+              progress: progresso,
+              interestRate: p.taxaJuros,
+              duration: p.prazoMeses,
+              minInvestment: Math.min(100, valorRestante),
+              risk:
+                p.taxaJuros <= 1
+                  ? "Baixo"
+                  : p.taxaJuros <= 2
+                  ? "Médio"
+                  : "Alto",
+              type: "Empréstimo",
+              category: p.categoria,
+              investors: numeroInvestidores,
+              daysLeft: 30,
+            };
+          })
+        );
 
         if (isMounted) {
           setOpportunities(convertidas);
@@ -197,15 +233,24 @@ export default function MarketplacePage() {
     return matchesSearch && matchesRisk && matchesValue && matchesRate;
   });
 
-  // Estatísticas calculadas
+  // Estatísticas calculadas dos dados reais
   const stats = {
     totalOpportunities: filteredOpportunities.length,
     totalValue: filteredOpportunities.reduce(
       (sum, opp) => sum + opp.totalValue,
       0
     ),
-    avgReturn: 1.4,
-    activeInvestors: 68,
+    avgReturn:
+      filteredOpportunities.length > 0
+        ? filteredOpportunities.reduce(
+            (sum, opp) => sum + opp.interestRate,
+            0
+          ) / filteredOpportunities.length
+        : 0,
+    activeInvestors: filteredOpportunities.reduce(
+      (sum, opp) => sum + opp.investors,
+      0
+    ),
   };
 
   // ============================================
@@ -267,7 +312,7 @@ export default function MarketplacePage() {
             <StatCard
               icon={TrendingUp}
               label="Retorno Médio"
-              value={`${stats.avgReturn}% a.m.`}
+              value={`${stats.avgReturn.toFixed(1)}% a.m.`}
               color="indigo"
             />
             <StatCard
@@ -425,28 +470,34 @@ function OpportunityCard({ opportunity, onViewDetails }: OpportunityCardProps) {
         <div className="flex-1">
           <div className="flex items-center gap-2 mb-2 flex-wrap">
             <span
-              className={`px-2 md:px-3 py-1 rounded-lg text-xs font-bold ${getCategoryColor(
+              className={`px-2 md:px-3 py-1 rounded-lg text-xs font-bold whitespace-nowrap ${getCategoryColor(
                 opportunity.category
               )}`}
             >
               {opportunity.category}
             </span>
             <span
-              className={`px-2 md:px-3 py-1 rounded-lg text-xs font-bold border ${getRiskColor(
+              className={`px-2 md:px-3 py-1 rounded-lg text-xs font-bold border whitespace-nowrap ${getRiskColor(
                 opportunity.risk
               )}`}
             >
               {opportunity.risk}
             </span>
           </div>
-          <h3 className="text-base md:text-lg font-bold text-gray-900 mb-1 group-hover:text-violet-600 transition-colors">
-            {opportunity.businessName}
+          <h3 className="text-base md:text-lg font-bold text-gray-900 mb-1 group-hover:text-violet-600 transition-colors truncate">
+            {opportunity.businessName.length > 15
+              ? `${opportunity.businessName.substring(0, 15)}...`
+              : opportunity.businessName}
           </h3>
-          <p className="text-xs text-gray-500 font-medium mb-2">
-            {opportunity.meiName}
+          <p className="text-xs text-gray-500 font-medium mb-2 truncate">
+            {opportunity.meiName.length > 10
+              ? `${opportunity.meiName.substring(0, 10)}...`
+              : opportunity.meiName}
           </p>
-          <p className="text-sm text-gray-600 line-clamp-2">
-            {opportunity.description}
+          <p className="text-sm text-gray-600 line-clamp-2 break-words">
+            {opportunity.description.length > 35
+              ? `${opportunity.description.substring(0, 35)}...`
+              : opportunity.description}
           </p>
         </div>
       </div>
@@ -458,7 +509,7 @@ function OpportunityCard({ opportunity, onViewDetails }: OpportunityCardProps) {
             <Target className="w-3 h-3" />
             Meta Total
           </p>
-          <p className="text-sm md:text-base font-bold text-violet-700">
+          <p className="text-sm md:text-base font-bold text-violet-700 truncate">
             R$ {(opportunity.totalValue / 1000).toFixed(0)}k
           </p>
         </div>
@@ -498,13 +549,13 @@ function OpportunityCard({ opportunity, onViewDetails }: OpportunityCardProps) {
       </div>
 
       {/* Additional Info */}
-      <div className="flex items-center gap-4 mb-4 pb-4 border-b border-gray-100">
-        <div className="flex items-center gap-1 text-xs text-gray-600">
+      <div className="flex items-center gap-4 mb-4 pb-4 border-b border-gray-100 flex-wrap">
+        <div className="flex items-center gap-1 text-xs text-gray-600 whitespace-nowrap">
           <Users className="w-4 h-4 text-violet-500" />
           <span className="font-semibold">{opportunity.investors}</span>{" "}
-          investidores
+          investidor{opportunity.investors !== 1 ? "es" : ""}
         </div>
-        <div className="flex items-center gap-1 text-xs text-gray-600">
+        <div className="flex items-center gap-1 text-xs text-gray-600 whitespace-nowrap">
           <Clock className="w-4 h-4 text-orange-500" />
           <span className="font-semibold">{opportunity.daysLeft}</span> dias
           restantes
