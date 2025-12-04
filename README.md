@@ -59,19 +59,27 @@ yarn install
 Crie um arquivo `.env.local` na raiz do projeto com as seguintes variáveis:
 
 ```env
-# URL do Backend (Local)
-NEXT_PUBLIC_API_URL=http://localhost:8080/api
+# URL do Backend em Produção (Render) - Recomendado para testes
+NEXT_PUBLIC_API_URL=https://finexus-backend.onrender.com/api
 
-# Para produção, use:
-# NEXT_PUBLIC_API_URL=https://finexus-backend.onrender.com/api
+# Para desenvolvimento local, comente a linha acima e descomente abaixo:
+# NEXT_PUBLIC_API_URL=http://localhost:8080/api
 
 # Outras configurações
 NEXT_PUBLIC_APP_NAME=Finexus
 ```
 
-> **Nota:** Para ambiente local, use `http://localhost:8080/api`. Para produção na Vercel, use `https://finexus-backend.onrender.com/api`
+> **💡 Dica para Avaliadores:**  
+> A configuração acima já está pronta para uso! Com a URL do backend em produção ativa, você pode **testar o Frontend imediatamente** sem precisar configurar ou executar o Backend localmente. Basta clonar o projeto, instalar as dependências e rodar `npm run dev`.
+>
+> **Para Desenvolvedores:** Se você estiver desenvolvendo localmente e precisar testar com o backend local, comente a URL de produção e descomente a URL localhost.
+### 4️⃣ Execute o Backend (Opcional)
 
-### 4️⃣ Execute o Backend
+> **⚠️ ATENÇÃO:**  
+> **Se você configurou a URL de Produção no passo anterior** (`.env.local` com `https://finexus-backend.onrender.com/api`), **pule esta etapa**.  
+> O backend já está rodando em produção e você não precisa configurá-lo localmente.
+
+**Apenas para desenvolvedores que escolheram rodar o backend localmente:**
 
 A aplicação frontend depende do backend para funcionar corretamente. Certifique-se de que o backend está rodando:
 
@@ -105,15 +113,15 @@ Para testar a aplicação, você pode criar usuários através da tela de cadast
 
 **Exemplo de usuário MEI (Tomador):**
 
-- Email: mei@exemplo.com
-- Senha: senha123
+- CPF: 888.888.888-88 
+- Senha: 123456
 
 **Exemplo de usuário Investidor:**
 
-- Email: investidor@exemplo.com
-- Senha: senha123
+- Email: 555.555.555-55
+- Senha: 123456
 
-> **Atenção:** Essas credenciais são apenas exemplos. Configure usuários reais no seu ambiente.
+> **Atenção:** o BACKEND demora para acordar então depois de logar vai dar erro de conexão, então é so esperar uns minutos e vai funcionar
 
 ---
 
