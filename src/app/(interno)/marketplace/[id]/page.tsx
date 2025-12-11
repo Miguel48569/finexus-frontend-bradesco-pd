@@ -779,40 +779,44 @@ export default function DetalhesInvestimentoPage() {
 
       {/* 🔄 MODAL MODIFICADO: Agora exibe dados do investimento criado e botão confirma o pagamento */}
       {showModalInvestir && investimentoCriado && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 animate-fade-in">
-          <div className="bg-white rounded-3xl shadow-2xl p-0 max-w-md w-full overflow-hidden animate-scale-in">
-            <div className="bg-gradient-to-r from-violet-600 to-purple-600 p-6 text-white flex items-center gap-3">
-              <DollarSign className="w-8 h-8" />
-              <div>
-                <h3 className="text-2xl font-bold leading-tight">
-                  Confirmar Pagamento
-                </h3>
-                <p className="text-sm opacity-80">
-                  Investimento criado com sucesso
-                </p>
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-2 sm:p-4 animate-fade-in overflow-y-auto">
+          <div className="bg-white rounded-xl sm:rounded-2xl md:rounded-3xl shadow-2xl p-0 max-w-md w-full my-4 sm:my-8 overflow-hidden animate-scale-in max-h-[95vh] overflow-y-auto">
+            <div className="bg-gradient-to-r from-violet-600 to-purple-600 p-3 sm:p-4 md:p-6 text-white sticky top-0 z-10">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <DollarSign className="w-5 h-5 sm:w-6 sm:h-6 md:w-8 md:h-8 flex-shrink-0" />
+                <div>
+                  <h3 className="text-lg sm:text-xl md:text-2xl font-bold leading-tight">
+                    Confirmar Pagamento
+                  </h3>
+                  <p className="text-[10px] sm:text-xs md:text-sm opacity-90">
+                    Investimento criado com sucesso
+                  </p>
+                </div>
               </div>
             </div>
-            <div className="p-8">
-              <p className="text-gray-700 mb-4 text-lg font-semibold text-center">
+            <div className="p-3 sm:p-4 md:p-8">
+              <p className="text-gray-700 mb-3 sm:mb-4 text-sm sm:text-base md:text-lg font-semibold text-center leading-snug">
                 Seu investimento em{" "}
-                <span className="text-violet-700">
+                <span className="text-violet-700 block sm:inline mt-1 sm:mt-0">
                   {investimento.businessName}
                 </span>{" "}
                 foi criado!
               </p>
 
-              <div className="bg-gray-50 rounded-xl p-4 mb-6 flex flex-col gap-2">
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-500 text-sm">
+              <div className="bg-gray-50 rounded-lg sm:rounded-xl p-2.5 sm:p-3 md:p-4 mb-3 sm:mb-4 md:mb-6 flex flex-col gap-1.5 sm:gap-2">
+                <div className="flex justify-between items-center gap-2">
+                  <span className="text-gray-500 text-[10px] sm:text-xs md:text-sm whitespace-nowrap">
                     ID do Investimento
                   </span>
-                  <span className="font-semibold text-gray-900">
+                  <span className="font-semibold text-gray-900 text-xs sm:text-sm md:text-base">
                     #{investimentoCriado.id}
                   </span>
                 </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-500 text-sm">Valor Investido</span>
-                  <span className="text-2xl font-bold text-violet-700">
+                <div className="flex justify-between items-center gap-2">
+                  <span className="text-gray-500 text-[10px] sm:text-xs md:text-sm whitespace-nowrap">
+                    Valor Investido
+                  </span>
+                  <span className="text-lg sm:text-xl md:text-2xl font-bold text-violet-700">
                     R${" "}
                     {investimentoCriado.valorInvestido.toLocaleString("pt-BR", {
                       minimumFractionDigits: 2,
@@ -820,11 +824,11 @@ export default function DetalhesInvestimentoPage() {
                     })}
                   </span>
                 </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-500 text-sm">
+                <div className="flex justify-between items-center gap-2">
+                  <span className="text-gray-500 text-[10px] sm:text-xs md:text-sm whitespace-nowrap">
                     Rendimento Esperado
                   </span>
-                  <span className="font-semibold text-green-600">
+                  <span className="font-semibold text-green-600 text-xs sm:text-sm md:text-base">
                     R${" "}
                     {investimentoCriado.rendimentoEsperado.toLocaleString(
                       "pt-BR",
@@ -835,9 +839,11 @@ export default function DetalhesInvestimentoPage() {
                     )}
                   </span>
                 </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-500 text-sm">Status</span>
-                  <span className="px-2 py-1 bg-amber-100 text-amber-700 rounded-full text-xs font-semibold">
+                <div className="flex justify-between items-center gap-2">
+                  <span className="text-gray-500 text-[10px] sm:text-xs md:text-sm">
+                    Status
+                  </span>
+                  <span className="px-2 py-0.5 sm:py-1 bg-amber-100 text-amber-700 rounded-full text-[10px] sm:text-xs font-semibold">
                     {investimentoCriado.status}
                   </span>
                 </div>
@@ -845,34 +851,38 @@ export default function DetalhesInvestimentoPage() {
 
               {/* Exibe QR Code se disponível */}
               {investimentoCriado.qrCodeUrl && (
-                <div className="bg-white border-2 border-gray-200 rounded-xl p-4 mb-6 text-center">
-                  <p className="text-sm text-gray-600 mb-3">Pague com PIX</p>
-                  <img
-                    src={investimentoCriado.qrCodeUrl}
-                    alt="QR Code PIX"
-                    className="w-48 h-48 mx-auto"
-                  />
+                <div className="bg-white border-2 border-gray-200 rounded-lg sm:rounded-xl p-2 sm:p-3 md:p-4 mb-3 sm:mb-4 md:mb-6 text-center">
+                  <p className="text-[10px] sm:text-xs md:text-sm text-gray-700 mb-2 sm:mb-3 font-bold">
+                    Pague com PIX
+                  </p>
+                  <div className="flex items-center justify-center">
+                    <img
+                      src={investimentoCriado.qrCodeUrl}
+                      alt="QR Code PIX"
+                      className="w-32 h-32 xs:w-36 xs:h-36 sm:w-44 sm:h-44 md:w-52 md:h-52 object-contain"
+                    />
+                  </div>
                 </div>
               )}
 
-              <p className="text-sm text-gray-600 text-center mb-6">
+              <p className="text-[10px] sm:text-xs md:text-sm text-gray-600 text-center mb-3 sm:mb-4 md:mb-6 px-1 sm:px-2 leading-relaxed">
                 Clique em "Confirmar Pagamento" após realizar o pagamento para
                 finalizar o investimento.
               </p>
 
-              <div className="flex gap-3 mt-6">
+              <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
                 <button
                   onClick={() => {
                     setShowModalInvestir(false);
                     setInvestimentoCriado(null);
                   }}
-                  className="flex-1 border-2 border-gray-300 text-gray-700 py-3 rounded-lg font-semibold hover:bg-gray-50 transition"
+                  className="w-full sm:flex-1 border-2 border-gray-300 text-gray-700 py-2 sm:py-2.5 md:py-3 rounded-lg font-semibold hover:bg-gray-50 transition text-xs sm:text-sm md:text-base"
                 >
                   Cancelar
                 </button>
                 <button
                   onClick={confirmarInvestimento}
-                  className="flex-1 bg-violet-600 hover:bg-violet-700 text-white py-3 rounded-lg font-semibold shadow-lg transition"
+                  className="w-full sm:flex-1 bg-violet-600 hover:bg-violet-700 text-white py-2 sm:py-2.5 md:py-3 rounded-lg font-semibold shadow-lg transition text-xs sm:text-sm md:text-base"
                 >
                   Confirmar Pagamento
                 </button>
