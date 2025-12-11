@@ -70,7 +70,7 @@ export default function Etapa3({
       {/* Upload de Arquivos */}
       <div>
         <label className="block text-sm font-semibold text-gray-700 mb-3">
-          Anexar Documentos <span className="text-red-500">*</span>
+          Anexar Documentos <span className="text-gray-400">(Opcional)</span>
         </label>
         <div className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center hover:border-violet-500 transition cursor-pointer bg-slate-100">
           <input
